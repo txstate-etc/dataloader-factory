@@ -1,0 +1,46 @@
+- id: 1
+  authorId: 6
+  name: Nightseer
+  genres:
+    - fantasy
+- id: 2
+  authorId: 6
+  name: Bloody Bones
+  genres:
+    - horror
+- id: 3
+  authorId: 1
+  name: Tale of Two Cities
+  genres:
+    - classic
+- id: 4
+  authorId: 2
+  name: Cards on the Table
+  genres:
+    - mystery
+- id: 5
+  authorId: 5
+  name: Harry Potter and the Prisoner of Azkaban
+  genres:
+    - fantasy
+- id: 6
+  authorId: 4
+  name: Handmaiden's Tale
+  genres:
+    - dystopia
+- id: 7
+  authorId: 5
+  name: Harry Potter and the Sorceror's Stone
+  genres:
+    - fantasy
+- id: 8
+  authorId: 3
+  name: The Hound of the Baskervilles
+  genres:
+    - mystery
+- id: 9
+  authorId: 1
+  name: A Christmas Carol
+  genres:
+    - classic
+    - holiday
