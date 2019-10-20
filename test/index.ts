@@ -8,8 +8,8 @@ async function getData (type:string):Promise<any[]> {
   return yaml.safeLoad(ymlstring)
 }
 
-DataLoaderFactory.registerFiltered('booksByAuthorId', {
-  returnMany: true,
+const BOOKS_BY_AUTHOR_ID = 'booksByAuthorId'
+DataLoaderFactory.registerFiltered(BOOKS_BY_AUTHOR_ID, {
   fetch: async (keys, filters) => {
     const allbooks = await getData('books')
     return allbooks.filter(book => keys.includes(book.authorId) && book.genres.includes(filters.genre))
@@ -18,9 +18,9 @@ DataLoaderFactory.registerFiltered('booksByAuthorId', {
 })
 
 describe('bookloader', () => {
+  const dataLoaderFactory = new DataLoaderFactory()
   it('should be able to load books by authorId', async () => {
-    const dataLoaderFactory = new DataLoaderFactory()
-    const loader = dataLoaderFactory.filtered('booksByAuthorId', { genre: 'mystery' })
+    const loader = dataLoaderFactory.filtered(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
     const authoryml = await fsp.readFile('test/data/authors.yml', 'utf-8')
     const authors = yaml.safeLoad(authoryml)
     const authorBooks = await loader.loadMany(authors.map((a:any) => a.id))
@@ -30,5 +30,14 @@ describe('bookloader', () => {
         expect(book.genres).to.include('mystery')
       }
     }
+  })
+  it('should return an empty array for an unrecognized authorId', async () => {
+    const loader = dataLoaderFactory.filtered(BOOKS_BY_AUTHOR_ID)
+    const authorBooks = await loader.load(999)
+    expect(authorBooks).to.have.length(0)
+  })
+  it('should have cached authorId fetches', async () => {
+    const cache = dataLoaderFactory.filteredcache(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
+    expect(cache).to.have.length(6)
   })
 })

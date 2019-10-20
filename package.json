@@ -33,5 +33,6 @@
   "dependencies": {
     "dataloader": "^1.4.0",
     "fast-json-stable-stringify": "2.0.0"
-  }
+  },
+  "files": ["dist/**/*"]
 }
