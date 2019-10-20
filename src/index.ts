@@ -27,31 +27,48 @@ export interface FilteredLoaderConfig {
   extractId? (item:any): any
 }
 
+export interface LoaderConfig {
+  fetch (ids:any[]): Promise<any[]>
+  extractId? (item:any): any
+  options?: DataLoader.Options<any,any>
+}
+
 interface FilteredStorageObject {
   loader: DataLoader<any,any>
   cache?: Map<string,any>
 }
 export class DataLoaderFactory {
-  private static registry:{ [key:string]: () => DataLoader<any,any> }
-  static register(key:string, loadergenerator:() => DataLoader<any,any>) {
-    DataLoaderFactory.registry[key] = loadergenerator
+  private static registry:{ [id:string]: LoaderConfig }
+  static register(id:string, loaderConfig:LoaderConfig) {
+    DataLoaderFactory.registry[id] = loaderConfig
   }
   private static filteredregistry:{ [keys:string]: FilteredLoaderConfig } = {}
   static registerFiltered (key:string, loader:FilteredLoaderConfig) {
     DataLoaderFactory.filteredregistry[key] = loader
   }
 
-  private cache: { [keys:string]: DataLoader<any,any> }
+  private loaders: { [keys:string]: DataLoader<any,any> }
   get (key:string):DataLoader<any,any> {
-    if (!this.cache[key]) this.cache[key] = DataLoaderFactory.registry[key]()
-    return this.cache[key]
+    if (!this.loaders[key]) this.loaders[key] = this.generateIdLoader(DataLoaderFactory.registry[key])
+    return this.loaders[key]
+  }
+  private generateIdLoader (loaderConfig:LoaderConfig):DataLoader<any,any> {
+    return new DataLoader<any,any>(async (ids:any[]):Promise<any[]> => {
+      const items = await loaderConfig.fetch(ids)
+      const keyed = items.reduce((keyed, item) => {
+        const key = stringify(loaderConfig.extractId ? loaderConfig.extractId(item) : item.id)
+        keyed[key] = item
+        return keyed
+      }, {})
+      return ids.map(stringify).map(id => keyed[id])
+    }, loaderConfig.options || {})
   }
 
   private filteredloaders: { [keys:string]: {
     [keys:string]: FilteredStorageObject
   }}
   constructor () {
-    this.cache = {}
+    this.loaders = {}
     this.filteredloaders = {}
   }
   getFiltered (key:string, filters:any={}):DataLoader<any,any> {
