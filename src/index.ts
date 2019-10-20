@@ -54,7 +54,7 @@ export class DataLoaderFactory {
     this.cache = {}
     this.filteredloaders = {}
   }
-  filtered (key:string, filters:any={}):DataLoader<any,any> {
+  getFiltered (key:string, filters:any={}):DataLoader<any,any> {
     const loaderConfig = DataLoaderFactory.filteredregistry[key]
     if (!loaderConfig) throw new Error('Called DataLoaderFactory.filtered() with an unregistered key.')
     if (!this.filteredloaders[key]) this.filteredloaders[key] = {}
@@ -63,11 +63,11 @@ export class DataLoaderFactory {
     if (!filtered[filterkey]) filtered[filterkey] = this.generateFilteredLoader(filters, loaderConfig)
     return filtered[filterkey].loader
   }
-  filteredcache (key:string, filters:any):Map<string,any>|undefined {
+  getFilteredcache (key:string, filters:any):Map<string,any>|undefined {
     const filterkey = stringify(filters)
     return ((this.filteredloaders[key] || {})[filterkey] || {}).cache
   }
-  generateFilteredLoader (filters:any, loaderConfig:FilteredLoaderConfig):FilteredStorageObject {
+  private generateFilteredLoader (filters:any, loaderConfig:FilteredLoaderConfig):FilteredStorageObject {
     const cache = loaderConfig.skipCache ? undefined : new Map<string, any>()
     const loader = new DataLoader<any,any>(async (keys:any[]):Promise<any[]> => {
       const stringkeys:string[] = keys.map(stringify)

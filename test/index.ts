@@ -20,7 +20,7 @@ DataLoaderFactory.registerFiltered(BOOKS_BY_AUTHOR_ID, {
 describe('bookloader', () => {
   const dataLoaderFactory = new DataLoaderFactory()
   it('should be able to load books by authorId', async () => {
-    const loader = dataLoaderFactory.filtered(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
+    const loader = dataLoaderFactory.getFiltered(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
     const authoryml = await fsp.readFile('test/data/authors.yml', 'utf-8')
     const authors = yaml.safeLoad(authoryml)
     const authorBooks = await loader.loadMany(authors.map((a:any) => a.id))
@@ -32,12 +32,12 @@ describe('bookloader', () => {
     }
   })
   it('should return an empty array for an unrecognized authorId', async () => {
-    const loader = dataLoaderFactory.filtered(BOOKS_BY_AUTHOR_ID)
+    const loader = dataLoaderFactory.getFiltered(BOOKS_BY_AUTHOR_ID)
     const authorBooks = await loader.load(999)
     expect(authorBooks).to.have.length(0)
   })
   it('should have cached authorId fetches', async () => {
-    const cache = dataLoaderFactory.filteredcache(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
+    const cache = dataLoaderFactory.getFilteredcache(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
     expect(cache).to.have.length(6)
   })
 })
