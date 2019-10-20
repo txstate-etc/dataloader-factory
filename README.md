@@ -1,4 +1,4 @@
-# dataloader-extra
+# dataloader-factory
 DataLoader classes to make it easier to write complex graphql resolvers.
 
 ## Filtered DataLoaders
@@ -21,7 +21,7 @@ But adding the `genre: "mystery"` filter is not obvious and can be very confusin
 That's where this library can help. The resolver would look like this
 (ignore the overly simplistic data model for genre):
 ```
-import { DataLoaderFactory } from 'dataloader-extra'
+import { DataLoaderFactory } from 'dataloader-factory'
 DataLoaderFactory.registerFiltered('booksByAuthorId', {
   fetch: (authorIds, filters) => {
     return db.query(

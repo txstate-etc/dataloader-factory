@@ -1,5 +1,5 @@
 {
-  "name": "dataloader-extra",
+  "name": "dataloader-factory",
   "version": "1.0.0",
   "description": "DataLoader classes to make it easier to write complex graphql resolvers.",
   "main": "dist/index.js",
@@ -10,15 +10,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/txstate-etc/dataloader-extra.git"
+    "url": "git+https://github.com/txstate-etc/dataloader-factory.git"
   },
   "keywords": [],
   "author": "Nick Wing",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/txstate-etc/dataloader-extra/issues"
+    "url": "https://github.com/txstate-etc/dataloader-factory/issues"
   },
-  "homepage": "https://github.com/txstate-etc/dataloader-extra#readme",
+  "homepage": "https://github.com/txstate-etc/dataloader-factory#readme",
   "devDependencies": {
     "@types/chai": "4.1.3",
     "@types/js-yaml": "^3.12.1",
