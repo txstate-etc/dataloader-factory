@@ -8,7 +8,7 @@ order, since that is usually required to make DataLoader work.
 
 ## Basic Usage
 Fetching logic must be registered with the factory class at load time (register is a static method):
-```
+```javascript
 import { DataLoaderFactory } from 'dataloader-factory'
 DataLoaderFactory.register('authors', {
   fetch: async ids => {
@@ -17,7 +17,7 @@ DataLoaderFactory.register('authors', {
 })
 ```
 Then the factory should be added to resolver context on each request, e.g.:
-```
+```javascript
 new ApolloServer({
   context: req => {
     return { dataLoaderFactory: new DataLoaderFactory() }
@@ -25,7 +25,7 @@ new ApolloServer({
 })
 ```
 Then it may be used in resolvers:
-```
+```javascript
 export const bookAuthorResolver = (book, args, context) => {
   return context.dataLoaderFactory.get('authors').load(book.authorId)
 }
@@ -33,11 +33,11 @@ export const bookAuthorResolver = (book, args, context) => {
 
 ## Filtered DataLoaders
 Consider the following GraphQL query:
-```
+```javascript
 { authors { books(genre: "mystery") { title } } }
 ```
 The typical pattern for the authors.books dataloader looks like this:
-```
+```javascript
 const booksByAuthorId = new DataLoader(async (authorIds) => {
   const books = await db.query(
     `SELECT * FROM books WHERE authorId IN (${authorIds.map(id => '?').join(',')})`
@@ -50,7 +50,7 @@ But adding the `genre: "mystery"` filter is not obvious and can be very confusin
 
 That's where this library really shines. The resolver would look like this
 (ignore the overly simplistic data model for genre):
-```
+```javascript
 import { DataLoaderFactory } from 'dataloader-factory'
 DataLoaderFactory.registerFiltered('booksByAuthorId', {
   fetch: (authorIds, filters) => {
