@@ -56,7 +56,7 @@ export class DataLoaderFactory {
     return new DataLoader<any,any>(async (ids:any[]):Promise<any[]> => {
       const items = await loaderConfig.fetch(ids)
       const keyed = items.reduce((keyed, item) => {
-        const key = stringify(loaderConfig.extractId ? loaderConfig.extractId(item) : item.id)
+        const key = stringify(loaderConfig.extractId ? loaderConfig.extractId(item) : item.id || item._id)
         keyed[key] = item
         return keyed
       }, {})
@@ -96,7 +96,7 @@ export class DataLoaderFactory {
       if (loaderConfig.idLoaderKey) {
         const idLoader = this.get(loaderConfig.idLoaderKey)
         for (const item of items) {
-          const id = loaderConfig.extractId ? loaderConfig.extractId(item) : item.id
+          const id = loaderConfig.extractId ? loaderConfig.extractId(item) : item.id || item._id
           if (id) idLoader.prime(id, item)
         }
       }
