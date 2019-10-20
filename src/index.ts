@@ -38,9 +38,9 @@ interface FilteredStorageObject {
   cache?: Map<string,any>
 }
 export class DataLoaderFactory {
-  private static registry:{ [id:string]: LoaderConfig }
-  static register(id:string, loaderConfig:LoaderConfig) {
-    DataLoaderFactory.registry[id] = loaderConfig
+  private static registry:{ [keys:string]: LoaderConfig } = {}
+  static register(key:string, loaderConfig:LoaderConfig) {
+    DataLoaderFactory.registry[key] = loaderConfig
   }
   private static filteredregistry:{ [keys:string]: FilteredLoaderConfig } = {}
   static registerFiltered (key:string, loader:FilteredLoaderConfig) {
