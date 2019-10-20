@@ -33,7 +33,7 @@ export const bookAuthorResolver = (book, args, context) => {
 
 ## Filtered DataLoaders
 Consider the following GraphQL query:
-```javascript
+```graphql
 { authors { books(genre: "mystery") { title } } }
 ```
 The typical pattern for the authors.books dataloader looks like this:
