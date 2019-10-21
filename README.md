@@ -30,6 +30,19 @@ export const bookAuthorResolver = (book, args, context) => {
   return context.dataLoaderFactory.get('authors').load(book.authorId)
 }
 ```
+### Options
+`register` accepts more input:
+```javascript
+{
+  fetch: ids => []
+  // a function for extracting the id from each item returned by fetch
+  // if not specified, it guesses with this default function
+  extractId: item => item.id || item._id
+  // the options object to pass to dataloader upon creation
+  // see dataloader documentation for details
+  options: DataLoader.Options
+}
+```
 
 ## Filtered DataLoaders
 Consider the following GraphQL query:
@@ -69,3 +82,70 @@ export const authorBooksResolver = (author, args, context) => {
 }
 ```
 Behind the scenes, what this does is generate a distinct DataLoader for each set of args used on that resolver. Since a graphql query is always finite, and each request gets a new factory, the number of possible DataLoaders generated is finite and manageable as well.
+
+### Options
+`registerFiltered` accepts the following inputs:
+```typescript
+{
+  // accept arbitrary foreign keys and arbitrary arguments and return results
+  // the keys MUST appear in the result objects so that your
+  // extractKey function can retrieve them
+  fetch: async (keys, filters) => [] // required
+  // function that can pull the foreign key out of the result object
+  // must match the interface of the keys you're using in your fetch function
+  extractKey: item => item.authorId // required
+  // generated dataloaders will not keep a cache
+  skipCache: false
+  // maxBatchSize to be passed to each DataLoader
+  maxBatchSize: 1000
+  // cacheKeyFn to be passed to each DataLoader
+  cacheKeyFn: key => stringify(key)
+  // each call to DataLoader.load() should return one row instead of
+  // an array of rows
+  returnOne: false
+  // set idLoaderKey to the registered name of an ID Loader to automatically
+  // prime it with any results gathered
+  idLoaderKey: 'books'
+  // if you provide an idLoaderKey, you may need to specify how to extract the
+  // id from each returned item
+  extractId item => item.id || item._id
+}
+```
+
+## Advanced Usage
+Many GraphQL data types will have more than one other type referencing them. In those
+cases, it will probably be useful to create a single function for constructing and
+executing the query, and each `fetch` function will simply add the batched `keys` to
+the `filters` object, and then pass the merged `filters` to the single function.
+```javascript
+const executeBookQuery = filters => {
+  const where = []
+  const params = []
+  if (filters.ids) {
+    where.push(`id IN (${filters.ids.map(id => '?').join(',')})`)
+    params.push(filters.ids)
+  }
+  if (filters.authorIds) {
+    where.push(`authorId IN (${filters.authorIds.map(id => '?').join(',')})`)
+    params.push(filters.authorIds)
+  }
+  if (filters.genres) {
+    where.push(`genres IN (${filters.genres.map(id => '?').join(',')})`)
+    params.push(filters.genres)
+  }
+  const wherestr = where.length && `WHERE (${where.join(') AND (')})`
+  return db.query(`SELECT * FROM books ${wherestr}`, params)
+}
+DataLoaderFactory.registerFiltered('booksByAuthorId', {
+  fetch: (authorIds, filters) {
+    return executeBookQuery({ ...filters, authorIds })
+  },
+  extractKey: item => item.authorId
+})
+DataLoaderFactory.registerFiltered('booksByGenre', {
+  fetch: (genres, filters) {
+    return executeBookQuery({ ...filters, genres })
+  },
+  extractKey: item => item.genre
+})
+```
