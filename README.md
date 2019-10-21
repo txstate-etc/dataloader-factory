@@ -105,10 +105,9 @@ Behind the scenes, what this does is generate a distinct DataLoader for each set
   returnOne: false
   // set idLoaderKey to the registered name of an ID Loader to automatically
   // prime it with any results gathered
+  // NOTE: if your fetch function returns result objects that differ from those of
+  // your ID Loader, it's going to cause you problems
   idLoaderKey: 'books'
-  // if you provide an idLoaderKey, you may need to specify how to extract the
-  // id from each returned item
-  extractId item => item.id || item._id
 }
 ```
 

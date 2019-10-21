@@ -22,9 +22,6 @@ export interface FilteredLoaderConfig {
   // provide idLoaderKey to automatically prime the
   // id-based dataloader with any results gathered
   idLoaderKey?: string
-  // a function for extracting the primary key from a result,
-  // only needed with idLoaderKey, default uses 'id' property
-  extractId? (item:any): any
 }
 
 export interface LoaderConfig {
@@ -49,7 +46,9 @@ export class DataLoaderFactory {
 
   private loaders: { [keys:string]: DataLoader<any,any> }
   get (key:string):DataLoader<any,any> {
-    if (!this.loaders[key]) this.loaders[key] = this.generateIdLoader(DataLoaderFactory.registry[key])
+    const loaderConfig = DataLoaderFactory.registry[key]
+    if (!loaderConfig) throw new Error('Called DataLoaderFactory.get() with an unregistered key.')
+    if (!this.loaders[key]) this.loaders[key] = this.generateIdLoader(loaderConfig)
     return this.loaders[key]
   }
   private generateIdLoader (loaderConfig:LoaderConfig):DataLoader<any,any> {
@@ -73,7 +72,7 @@ export class DataLoaderFactory {
   }
   getFiltered (key:string, filters:any={}):DataLoader<any,any> {
     const loaderConfig = DataLoaderFactory.filteredregistry[key]
-    if (!loaderConfig) throw new Error('Called DataLoaderFactory.filtered() with an unregistered key.')
+    if (!loaderConfig) throw new Error('Called DataLoaderFactory.getFiltered() with an unregistered key.')
     if (!this.filteredloaders[key]) this.filteredloaders[key] = {}
     const filtered = this.filteredloaders[key]
     const filterkey = stringify(filters)
@@ -95,9 +94,12 @@ export class DataLoaderFactory {
       const items = await loaderConfig.fetch(Object.values(dedupekeys), filters)
       if (loaderConfig.idLoaderKey) {
         const idLoader = this.get(loaderConfig.idLoaderKey)
-        for (const item of items) {
-          const id = loaderConfig.extractId ? loaderConfig.extractId(item) : item.id || item._id
-          if (id) idLoader.prime(id, item)
+        if (idLoader) {
+          const idLoaderConfig = DataLoaderFactory.registry[loaderConfig.idLoaderKey]
+          for (const item of items) {
+            const id = idLoaderConfig.extractId ? idLoaderConfig.extractId(item) : item.id || item._id
+            if (id) idLoader.prime(id, item)
+          }
         }
       }
       const grouped = items.reduce((grouped, item) => {
