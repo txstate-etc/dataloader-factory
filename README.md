@@ -68,7 +68,7 @@ import { DataLoaderFactory } from 'dataloader-factory'
 DataLoaderFactory.registerFiltered('booksByAuthorId', {
   fetch: (authorIds, filters) => {
     const query = `SELECT * FROM books WHERE authorId IN (${authorIds.map('?').join(',')})`
-    const params = authorIds
+    const params = [...authorIds]
     if (filters.genre) {
       query += ' AND genre=?'
       params.push(filters.genre)
@@ -123,15 +123,15 @@ const executeBookQuery = filters => {
   const params = []
   if (filters.ids) {
     where.push(`id IN (${filters.ids.map(id => '?').join(',')})`)
-    params.push(filters.ids)
+    params.push(...filters.ids)
   }
   if (filters.authorIds) {
     where.push(`authorId IN (${filters.authorIds.map(id => '?').join(',')})`)
-    params.push(filters.authorIds)
+    params.push(...filters.authorIds)
   }
   if (filters.genres) {
     where.push(`genres IN (${filters.genres.map(id => '?').join(',')})`)
-    params.push(filters.genres)
+    params.push(...filters.genres)
   }
   const wherestr = where.length && `WHERE (${where.join(') AND (')})`
   return db.query(`SELECT * FROM books ${wherestr}`, params)
