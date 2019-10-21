@@ -12,7 +12,7 @@ Fetching logic must be registered with the factory class at load time (register 
 import { DataLoaderFactory } from 'dataloader-factory'
 DataLoaderFactory.register('authors', {
   fetch: async ids => {
-    return db.query(`SELECT * FROM authors WHERE id IN (${ids.map(id => '?').join(',')})`)
+    return db.query(`SELECT * FROM authors WHERE id IN (${ids.map(id => '?').join(',')})`, ids)
   }
 })
 ```
