@@ -75,7 +75,7 @@ DataLoaderFactory.registerFiltered('booksByAuthorId', {
     }
     return db.query(query, params)
   },
-  extractId: book => book.authorId
+  extractKey: book => book.authorId
 })
 export const authorBooksResolver = (author, args, context) => {
   return context.dataLoaderFactory.getFiltered('booksByAuthorId', args).load(author.id)
