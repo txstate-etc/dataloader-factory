@@ -29,6 +29,20 @@ DataLoaderFactory.register(BOOKS_BY_ID, {
   }
 })
 
+const BOOKS_BY_ID_AND_TITLE = 'booksByIdAndTitle'
+DataLoaderFactory.register(BOOKS_BY_ID_AND_TITLE, {
+  fetch: async (compoundkeys) => {
+    const allbooks = await getData('books')
+    const ret = allbooks.filter(book =>
+      compoundkeys.some(compoundkey =>
+        Object.keys(compoundkey).every(field => book[field] === compoundkey[field])
+      )
+    )
+    return ret
+  },
+  extractId: book => ({ id: book.id, name: book.name })
+})
+
 describe('bookloader', () => {
   const dataLoaderFactory = new DataLoaderFactory()
   before (() => {
@@ -79,5 +93,10 @@ describe('bookloader', () => {
     const book = await dataLoaderFactory.get(BOOKS_BY_ID).load(3)
     expect(byIdCount).to.equal(2)
     expect(book.id).to.equal(3)
+  })
+
+  it('should support compound keys', async () => {
+    const book = await dataLoaderFactory.get(BOOKS_BY_ID_AND_TITLE).load({ id: 2, name: 'Bloody Bones' })
+    expect (book.id).to.equal(2)
   })
 })
