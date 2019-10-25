@@ -1,21 +1,21 @@
 import stringify from 'fast-json-stable-stringify'
 import DataLoader from 'dataloader'
 
-export interface FilteredLoaderConfig {
+export interface FilteredLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> {
   // function that should pull the foreign key out of the result object
   // must match the interface of the keys you're using in your fetch function
-  extractKey (item:any): any|any[]
+  extractKey (item:ReturnType): KeyType|KeyType[]
   // accept arbitrary foreign keys and arbitrary arguments and return results
   // this is where your database logic goes
   // the foreign keys MUST appear in the result objects so that your
   // extractKey function can retrieve them
-  fetch (keys: any[], filters:any): Promise<any[]>
+  fetch (keys: KeyType[], filters:FilterType): Promise<ReturnType[]>
   // generated dataloaders will not keep a cache
   skipCache?: boolean
   // maxBatchSize to be passed to each DataLoader
   maxBatchSize?: number
   // cacheKeyFn to be passed to each DataLoader
-  cacheKeyFn? (key:any): string
+  cacheKeyFn? (key:KeyType): string
   // each call to DataLoader.load() should return an array instead of
   // a single value
   returnOne?: boolean
@@ -24,28 +24,28 @@ export interface FilteredLoaderConfig {
   idLoaderKey?: string
 }
 
-export interface LoaderConfig {
-  fetch (ids:any[]): Promise<any[]>
-  extractId? (item:any): any
-  options?: DataLoader.Options<any,any>
+export interface LoaderConfig<KeyType = any, ReturnType = any> {
+  fetch (ids:KeyType[]): Promise<ReturnType[]>
+  extractId? (item:ReturnType): KeyType
+  options?: DataLoader.Options<KeyType,ReturnType>
 }
 
-interface FilteredStorageObject {
-  loader: DataLoader<any,any>
-  cache?: Map<string,any>
+interface FilteredStorageObject<KeyType = any, ReturnType = any> {
+  loader: DataLoader<KeyType,ReturnType>
+  cache?: Map<string,ReturnType>
 }
 export class DataLoaderFactory {
   private static registry:{ [keys:string]: LoaderConfig } = {}
-  static register(key:string, loaderConfig:LoaderConfig) {
+  static register<KeyType = any, ReturnType = any> (key:string, loaderConfig:LoaderConfig<KeyType,ReturnType>) {
     DataLoaderFactory.registry[key] = loaderConfig
   }
   private static filteredregistry:{ [keys:string]: FilteredLoaderConfig } = {}
-  static registerFiltered (key:string, loader:FilteredLoaderConfig) {
+  static registerFiltered<KeyType = any, ReturnType = any> (key:string, loader:FilteredLoaderConfig<KeyType,ReturnType>) {
     DataLoaderFactory.filteredregistry[key] = loader
   }
 
   private loaders: { [keys:string]: DataLoader<any,any> }
-  get (key:string):DataLoader<any,any> {
+  get<KeyType = any, ReturnType = any> (key:string):DataLoader<KeyType,ReturnType> {
     const loaderConfig = DataLoaderFactory.registry[key]
     if (!loaderConfig) throw new Error('Called DataLoaderFactory.get() with an unregistered key.')
     if (!this.loaders[key]) this.loaders[key] = this.generateIdLoader(loaderConfig)
@@ -70,7 +70,7 @@ export class DataLoaderFactory {
     this.loaders = {}
     this.filteredloaders = {}
   }
-  getFiltered (key:string, filters:any={}):DataLoader<any,any> {
+  getFiltered<KeyType = any, ReturnType = any> (key:string, filters:any={}):DataLoader<KeyType,ReturnType> {
     const loaderConfig = DataLoaderFactory.filteredregistry[key]
     if (!loaderConfig) throw new Error('Called DataLoaderFactory.getFiltered() with an unregistered key.')
     if (!this.filteredloaders[key]) this.filteredloaders[key] = {}
