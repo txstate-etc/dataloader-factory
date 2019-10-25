@@ -4,7 +4,7 @@ import DataLoader from 'dataloader'
 export interface FilteredLoaderConfig {
   // function that should pull the foreign key out of the result object
   // must match the interface of the keys you're using in your fetch function
-  extractKey (item:any): any
+  extractKey (item:any): any|any[]
   // accept arbitrary foreign keys and arbitrary arguments and return results
   // this is where your database logic goes
   // the foreign keys MUST appear in the result objects so that your
@@ -103,12 +103,16 @@ export class DataLoaderFactory {
         }
       }
       const grouped = items.reduce((grouped, item) => {
-        const key = stringify(loaderConfig.extractKey(item))
-        if (loaderConfig.returnOne) {
-          grouped[key] = item
-        } else {
-          if (!grouped[key]) grouped[key] = []
-          grouped[key].push(item)
+        let keys = loaderConfig.extractKey(item)
+        if (!Array.isArray(keys)) keys = [keys]
+        for (const key of keys) {
+          const keystr = stringify(key)
+          if (loaderConfig.returnOne) {
+            grouped[keystr] = item
+          } else {
+            if (!grouped[keystr]) grouped[keystr] = []
+            grouped[keystr].push(item)
+          }
         }
         return grouped
       }, {})

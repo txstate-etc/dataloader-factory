@@ -43,6 +43,16 @@ DataLoaderFactory.register(BOOKS_BY_ID_AND_TITLE, {
   extractId: book => ({ id: book.id, name: book.name })
 })
 
+const BOOKS_BY_GENRE = 'booksByGenre'
+DataLoaderFactory.registerFiltered(BOOKS_BY_GENRE, {
+  fetch: async genres => {
+    const allbooks = await getData('books')
+    const books = allbooks.filter(book => book.genres.some((genre:string) => genres.includes(genre)))
+    return books
+  },
+  extractKey: book => book.genres
+})
+
 describe('bookloader', () => {
   const dataLoaderFactory = new DataLoaderFactory()
   before (() => {
@@ -97,6 +107,14 @@ describe('bookloader', () => {
 
   it('should support compound keys', async () => {
     const book = await dataLoaderFactory.get(BOOKS_BY_ID_AND_TITLE).load({ id: 2, name: 'Bloody Bones' })
-    expect (book.id).to.equal(2)
+    expect(book.id).to.equal(2)
+  })
+
+  it('should support many to many, i.e. extractKey returns an array', async () => {
+    const books = await dataLoaderFactory.getFiltered(BOOKS_BY_GENRE).load('mystery')
+    expect(books).to.have.length(2)
+    for (const book of books) {
+      expect(book.genres.includes('mystery'))
+    }
   })
 })
