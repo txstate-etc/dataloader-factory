@@ -2,14 +2,20 @@ import stringify from 'fast-json-stable-stringify'
 import DataLoader from 'dataloader'
 
 export interface FilteredLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> {
-  // function that should pull the foreign key out of the result object
-  // must match the interface of the keys you're using in your fetch function
-  extractKey (item:ReturnType): KeyType|KeyType[]
   // accept arbitrary foreign keys and arbitrary arguments and return results
   // this is where your database logic goes
   // the foreign keys MUST appear in the result objects so that your
   // extractKey function can retrieve them
   fetch (keys: KeyType[], filters:FilterType): Promise<ReturnType[]>
+  // function that should pull the foreign key out of the result object
+  // must match the interface of the keys you're using in your fetch function
+  extractKey? (item:ReturnType): KeyType|KeyType[]
+  // in rare cases it may be that a key cannot be extracted from an item because
+  // an irreversible operation is involved (like evaluating greater than or less than)
+  // in those cases, you can provide this matchKey function that examines
+  // whether the result object is a match for the given key; the answer
+  // will help us put the fetched dataset back together properly
+  matchKey?: (key:KeyType, item:ReturnType) => boolean
   // generated dataloaders will not keep a cache
   skipCache?: boolean
   // maxBatchSize to be passed to each DataLoader
@@ -41,6 +47,8 @@ export class DataLoaderFactory {
   }
   private static filteredregistry:{ [keys:string]: FilteredLoaderConfig } = {}
   static registerFiltered<KeyType = any, ReturnType = any> (key:string, loader:FilteredLoaderConfig<KeyType,ReturnType>) {
+    if (!loader.extractKey && !loader.matchKey) throw new Error('Tried to register a filtered dataloader without either extractKey or matchKey defined. One of the two is required.')
+    if (loader.extractKey && loader.matchKey) throw new Error('Registered a filtered dataloader with both extractKey and matchKey defined. Only one of these may be provided.')
     DataLoaderFactory.filteredregistry[key] = loader
   }
 
@@ -102,16 +110,24 @@ export class DataLoaderFactory {
           }
         }
       }
+
+      const addtogrouped = (grouped:{ [keys:string]: any }, key: any, item:any) => {
+        const keystr = stringify(key)
+        if (loaderConfig.returnOne) {
+          grouped[keystr] = item
+        } else {
+          if (!grouped[keystr]) grouped[keystr] = []
+          grouped[keystr].push(item)
+        }
+      }
       const grouped = items.reduce((grouped, item) => {
-        let keys = loaderConfig.extractKey(item)
-        if (!Array.isArray(keys)) keys = [keys]
-        for (const key of keys) {
-          const keystr = stringify(key)
-          if (loaderConfig.returnOne) {
-            grouped[keystr] = item
-          } else {
-            if (!grouped[keystr]) grouped[keystr] = []
-            grouped[keystr].push(item)
+        if (loaderConfig.extractKey) {
+          let keyorkeys = loaderConfig.extractKey(item)
+          if (Array.isArray(keyorkeys)) for (const key of keyorkeys) addtogrouped(grouped, key, item)
+          else addtogrouped(grouped, keyorkeys, item)
+        } else if (loaderConfig.matchKey) {
+          for (const key of Object.values(dedupekeys)) {
+            if (loaderConfig.matchKey(key, item)) addtogrouped(grouped, key, item)
           }
         }
         return grouped
