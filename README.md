@@ -91,18 +91,27 @@ Behind the scenes, what this does is generate a distinct DataLoader for each set
   // the keys MUST appear in the result objects so that your
   // extractKey function can retrieve them
   fetch: async (keys, filters) => [] // required
+
   // function that can pull the foreign key out of the result object
   // must match the interface of the keys you're using in your fetch function
   extractKey: item => item.authorId // required
+
+  // advanced usage only, covered later in this readme
+  matchKey?: (key:KeyType, item:ReturnType) => boolean
+
   // generated dataloaders will not keep a cache
   skipCache: false
+
   // maxBatchSize to be passed to each DataLoader
   maxBatchSize: 1000
+
   // cacheKeyFn to be passed to each DataLoader
   cacheKeyFn: key => stringify(key)
+
   // each call to DataLoader.load() should return one row instead of
   // an array of rows
   returnOne: false
+
   // set idLoaderKey to the registered name of an ID Loader to automatically
   // prime it with any results gathered
   // NOTE: if your fetch function returns result objects that differ from those of
@@ -111,7 +120,7 @@ Behind the scenes, what this does is generate a distinct DataLoader for each set
 }
 ```
 
-## Advanced Usage
+## Advanced Usage Example
 Many GraphQL data types will have more than one other type referencing them. In those
 cases, it will probably be useful to create a single function for constructing and
 executing the query, and each `fetch` function will simply add the batched `keys` to
@@ -146,5 +155,31 @@ DataLoaderFactory.registerFiltered('booksByGenre', {
     return executeBookQuery({ ...filters, genres })
   },
   extractKey: item => item.genre
+})
+```
+
+## Compound Keys
+Compound Keys are fully supported. Any key object will be accepted. It is up to your `fetch` and `extractKey` functions
+to treat it properly. Internally, fast-json-stable-stringify is used to cache results, which will construct the same string
+even if two objects' keys have mismatching ordering.
+
+## matchKey
+In rare cases it may be that a key cannot be extracted from an item because
+an irreversible operation is involved (like evaluating greater than or less than)
+
+In those cases, you can provide a `matchKey` function that examines
+whether the result object is a match for the given key. The answer
+will help us put the fetched dataset back together properly.
+
+Please note that this makes the batched load an O(n^2) operation so `extractKey` is
+preferred whenever possible and a smaller `maxBatchSize` would be wise.
+```javascript
+DataLoaderFactory.registerFiltered('booksAfterYear', {
+  fetch: (years, filters) {
+    const ors = years.map(parseInt).map(year => `published > DATE('${year}0101')`)
+    return db.query(`SELECT * FROM books WHERE ${ors.join(') OR (')}`
+  },
+  matchKey: (year, book) => book.published.getTime() >= new Date(year, 0, 1)
+  maxBatchSize: 20
 })
 ```
