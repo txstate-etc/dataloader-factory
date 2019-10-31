@@ -2,31 +2,13 @@ import stringify from 'fast-json-stable-stringify'
 import DataLoader from 'dataloader'
 
 export interface FilteredLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> {
-  // accept arbitrary foreign keys and arbitrary arguments and return results
-  // this is where your database logic goes
-  // the foreign keys MUST appear in the result objects so that your
-  // extractKey function can retrieve them
   fetch (keys: KeyType[], filters:FilterType): Promise<ReturnType[]>
-  // function that should pull the foreign key out of the result object
-  // must match the interface of the keys you're using in your fetch function
   extractKey? (item:ReturnType): KeyType|KeyType[]
-  // in rare cases it may be that a key cannot be extracted from an item because
-  // an irreversible operation is involved (like evaluating greater than or less than)
-  // in those cases, you can provide this matchKey function that examines
-  // whether the result object is a match for the given key; the answer
-  // will help us put the fetched dataset back together properly
   matchKey?: (key:KeyType, item:ReturnType) => boolean
-  // generated dataloaders will not keep a cache
   skipCache?: boolean
-  // maxBatchSize to be passed to each DataLoader
   maxBatchSize?: number
-  // cacheKeyFn to be passed to each DataLoader
   cacheKeyFn? (key:KeyType): string
-  // each call to DataLoader.load() should return an array instead of
-  // a single value
   returnOne?: boolean
-  // provide idLoaderKey to automatically prime the
-  // id-based dataloader with any results gathered
   idLoaderKey?: string
 }
 
