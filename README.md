@@ -97,7 +97,7 @@ Behind the scenes, what this does is generate a distinct DataLoader for each set
   extractKey: item => item.authorId // required
 
   // advanced usage only, covered later in this readme
-  matchKey?: (key:KeyType, item:ReturnType) => boolean
+  matchKey: (key, item) => boolean
 
   // generated dataloaders will not keep a cache
   skipCache: false
@@ -151,7 +151,7 @@ DataLoaderFactory.registerFiltered('booksByAuthorId', {
   extractKey: item => item.authorId
 })
 DataLoaderFactory.registerFiltered('booksByGenre', {
-  fetch: (genres, filters) {
+  fetch: (genres, filters) => {
     return executeBookQuery({ ...filters, genres })
   },
   extractKey: item => item.genre
@@ -175,11 +175,29 @@ Please note that this makes the batched load an O(n^2) operation so `extractKey`
 preferred whenever possible and a smaller `maxBatchSize` would be wise.
 ```javascript
 DataLoaderFactory.registerFiltered('booksAfterYear', {
-  fetch: (years, filters) {
+  fetch: (years, filters) => {
     const ors = years.map(parseInt).map(year => `published > DATE('${year}0101')`)
     return db.query(`SELECT * FROM books WHERE ${ors.join(') OR (')}`
   },
   matchKey: (year, book) => book.published.getTime() >= new Date(year, 0, 1)
   maxBatchSize: 20
 })
+```
+
+## TypeScript
+This library is written in typescript and provides its own types. When you use the `register` and `get` methods (or the filtered versions), you may specify the KeyType and ReturnType as generics.
+```javascript
+DataLoaderFactory.register<string, IBook>('books', {
+  fetch: (ids) => { // typescript should know you'll receive string[]
+    ... // typescript should know you need to return IBook[]
+  },
+  extractId: (item) => { // typescript should know you'll receive IBook
+    ... // typescript should know you need to return string
+  }
+})
+```
+```javascript
+// typescript now knows .get() returns a DataLoader<string, IBook> so your .load()
+// will return an IBook
+dataLoaderFactory.get<string, IBook>('books').load(id)
 ```
