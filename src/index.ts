@@ -42,6 +42,8 @@ export class DataLoaderFactory {
     return this.loaders[key]
   }
   private generateIdLoader (loaderConfig:LoaderConfig):DataLoader<any,any> {
+    const options = loaderConfig.options || {}
+    if (!options.maxBatchSize) options.maxBatchSize = 1000
     return new DataLoader<any,any>(async (ids:any[]):Promise<any[]> => {
       const items = await loaderConfig.fetch(ids)
       const keyed = items.reduce((keyed, item) => {
@@ -50,7 +52,7 @@ export class DataLoaderFactory {
         return keyed
       }, {})
       return ids.map(stringify).map(id => keyed[id])
-    }, loaderConfig.options || {})
+    }, options || {})
   }
 
   private filteredloaders: { [keys:string]: {
