@@ -6,7 +6,7 @@ all the logic for constructing and executing a query against your database. The 
 take care of caching the DataLoaders and also helps with putting the results back into the correct
 order, since that is usually required to make DataLoader work.
 
-## Basic Usage
+## Basic Usage (Load by Primary Key)
 Fetching logic must be registered with the factory class at load time (register is a static method):
 ```javascript
 import { DataLoaderFactory } from 'dataloader-factory'
@@ -45,11 +45,16 @@ export const bookAuthorResolver = (book, args, context) => {
 ```
 
 ## Filtered DataLoaders
+The `register` and `get` methods are only appropriate for primary key loaders (or another key that
+identifies exactly one record). To fetch relations that return an array, a more complex pattern is required.
+This pattern also allows you to send optional filters for the array, so the methods are named
+`registerFiltered` and `getFiltered`.
+
 Consider the following GraphQL query:
 ```graphql
 { authors { books(genre: "mystery") { title } } }
 ```
-The typical pattern for the authors.books dataloader looks like this:
+Without dataloader-factory, the typical pattern for the authors.books dataloader looks like this:
 ```javascript
 const booksByAuthorId = new DataLoader(async (authorIds) => {
   const books = await db.query(
@@ -61,7 +66,7 @@ const booksByAuthorId = new DataLoader(async (authorIds) => {
 ```
 But adding the `genre: "mystery"` filter is not obvious and can be very confusing to implement.
 
-That's where this library really shines. The resolver would look like this
+That's where this library really shines. Using dataloader-factory, the resolver would look like this
 (ignore the overly simplistic data model for genre):
 ```javascript
 import { DataLoaderFactory } from 'dataloader-factory'
@@ -85,7 +90,7 @@ Behind the scenes, what this does is generate a distinct DataLoader for each set
 
 ### Options
 `registerFiltered` accepts the following inputs:
-```typescript
+```javascript
 {
   // accept arbitrary foreign keys and arbitrary arguments and return results
   // the keys MUST appear in the result objects so that your
@@ -108,8 +113,9 @@ Behind the scenes, what this does is generate a distinct DataLoader for each set
   // cacheKeyFn to be passed to each DataLoader
   cacheKeyFn: key => stringify(key)
 
-  // each call to DataLoader.load() should return one row instead of
-  // an array of rows
+  // Usually registerFiltered is for relations that return arrays, but in rare cases
+  // it may be useful on a one-to-one relation. If this is set to true, each call to
+  // DataLoader.load() will return an object instead of an array of objects
   returnOne: false
 
   // set idLoaderKey to the registered name of an ID Loader to automatically
