@@ -18,6 +18,15 @@ DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID, {
   },
   extractKey: (item) => item.authorId
 })
+const BOOKS_BY_AUTHOR_ID_MATCHKEY = 'booksByAuthorIdMatchKey'
+DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID_MATCHKEY, {
+  fetch: async (keys, filters) => {
+    const allbooks = await getData('books')
+    return allbooks.filter(book => keys.includes(book.authorId) && book.genres.includes(filters.genre))
+  },
+  matchKey: (key, item) => item.authorId === key
+})
+
 
 let byIdCount = 0
 const BOOKS_BY_ID = 'books'
@@ -52,6 +61,15 @@ DataLoaderFactory.registerManyToMany(BOOKS_BY_GENRE, {
   },
   extractKeys: book => book.genres
 })
+const BOOKS_BY_GENRE_MATCHKEY = 'booksByGenreMatchKey'
+DataLoaderFactory.registerManyToMany(BOOKS_BY_GENRE_MATCHKEY, {
+  fetch: async genres => {
+    const allbooks = await getData('books')
+    const books = allbooks.filter(book => book.genres.some((genre:string) => genres.includes(genre)))
+    return books
+  },
+  matchKey: (key, book) => book.genres.includes(key)
+})
 
 const BOOKS_BY_GENRE_JOINED = 'booksByGenreJoined'
 DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED, {
@@ -61,6 +79,16 @@ DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED, {
     // using [].concat because vscode/typescript was having fits about using .flat()
     return [].concat(...books.map(book => book.genres.map((g:any) => ({ key: g, value: book }))))
   }
+})
+const BOOKS_BY_GENRE_JOINED_MATCHKEY = 'booksByGenreJoinedMatchKey'
+DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED_MATCHKEY, {
+  fetch: async genres => {
+    const allbooks = await getData('books')
+    const books = allbooks.filter(book => book.genres.some((genre:string) => genres.includes(genre)))
+    // using [].concat because vscode/typescript was having fits about using .flat()
+    return [].concat(...books.map(book => book.genres.map((g:any) => ({ key: g, value: book }))))
+  },
+  matchKey: (key, book) => book.genres.includes(key)
 })
 
 describe('bookloader', () => {
@@ -130,6 +158,27 @@ describe('bookloader', () => {
 
   it('should work with the manyJoined pattern', async () => {
     const books = await dataLoaderFactory.getManyJoined(BOOKS_BY_GENRE_JOINED).load('mystery')
+    expect(books).to.have.length(2)
+    for (const book of books) {
+      expect(book.genres.includes('mystery'))
+    }
+  })
+  it('should support matchKey in one-to-many pattern', async () => {
+    const books = await dataLoaderFactory.getOneToMany(BOOKS_BY_AUTHOR_ID_MATCHKEY, { genre: 'mystery' }).load(2)
+    expect(books).to.have.length(1)
+    for (const book of books) {
+      expect(book.genres.includes('mystery'))
+    }
+  })
+  it('should support matchKey in many-to-many pattern', async () => {
+    const books = await dataLoaderFactory.getManyToMany(BOOKS_BY_GENRE_MATCHKEY).load('mystery')
+    expect(books).to.have.length(2)
+    for (const book of books) {
+      expect(book.genres.includes('mystery'))
+    }
+  })
+  it('should support matchKey in many-to-many-joined pattern', async () => {
+    const books = await dataLoaderFactory.getManyJoined(BOOKS_BY_GENRE_JOINED_MATCHKEY).load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))

@@ -1,27 +1,26 @@
 import stringify from 'fast-json-stable-stringify'
 import DataLoader from 'dataloader'
 
-interface BaseManyLoaderConfig<KeyType = any> {
+interface BaseManyLoaderConfig<KeyType, ReturnType> {
+  matchKey?: (key:KeyType, item:ReturnType) => boolean
   skipCache?: boolean
   maxBatchSize?: number
   cacheKeyFn? (key:KeyType): string
   idLoaderKey?: string
 }
 
-interface OneToManyLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> extends BaseManyLoaderConfig<KeyType> {
+interface OneToManyLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch (keys: KeyType[], filters:FilterType): Promise<ReturnType[]>
   extractKey? (item:ReturnType): KeyType
-  matchKey?: (key:KeyType, item:ReturnType) => boolean
 }
 
-interface ManyJoinedLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> extends BaseManyLoaderConfig<KeyType> {
+interface ManyJoinedLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch (keys: KeyType[], filters: FilterType): Promise<{ key: KeyType, value: ReturnType }[]>
 }
 
-interface ManyToManyLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> extends BaseManyLoaderConfig<KeyType> {
+interface ManyToManyLoaderConfig<KeyType = any, ReturnType = any, FilterType = any> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch (keys: KeyType[], filters:FilterType): Promise<ReturnType[]>
   extractKeys? (item:ReturnType): KeyType[]
-  matchKey?: (key:KeyType, item:ReturnType) => boolean
 }
 
 interface LoaderConfig<KeyType = any, ReturnType = any> {
@@ -112,7 +111,7 @@ export class DataLoaderFactory {
     return ((this.filteredloaders[key] || {})[filterkey] || {}).cache
   }
 
-  private prime<ReturnType> (loaderConfig: BaseManyLoaderConfig, items: ReturnType[]) {
+  private prime<KeyType, ReturnType> (loaderConfig: BaseManyLoaderConfig<KeyType, ReturnType>, items: ReturnType[]) {
     if (loaderConfig.idLoaderKey) {
       const idLoader = this.get(loaderConfig.idLoaderKey)
       if (idLoader) {
@@ -154,8 +153,9 @@ export class DataLoaderFactory {
           let keys = loaderConfig.extractKeys(item as ReturnType)
           for (const key of keys) addtogrouped(key, item)
         } else if ('matchKey' in loaderConfig && loaderConfig.matchKey) {
+          const actualitem = 'key' in item && 'value' in item ? item.value : item as ReturnType
           for (const key of Object.values(dedupekeys)) {
-            if (loaderConfig.matchKey(key, item as ReturnType)) addtogrouped(key, item)
+            if (loaderConfig.matchKey(key, actualitem)) addtogrouped(key, actualitem)
           }
         } else if ('key' in item) {
           addtogrouped(item.key, item.value)
