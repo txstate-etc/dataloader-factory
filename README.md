@@ -75,7 +75,8 @@ option of chaining `book -> acquisition -> library` or creating a new many-to-ma
 for efficiency (see the "Many-to-Many-Joined" section below).
 
 ### Options
-`registerOneToMany` accepts the following inputs:
+`registerOneToMany` accepts the following inputs. All of the *-to-many patterns accept the same options, except as
+noted in their section of the documentation.
 ```javascript
 {
   // accept arbitrary foreign keys and arbitrary arguments and return results
@@ -98,11 +99,6 @@ for efficiency (see the "Many-to-Many-Joined" section below).
 
   // cacheKeyFn to be passed to each DataLoader
   cacheKeyFn: key => stringify(key)
-
-  // Usually registerFiltered is for relations that return arrays, but in rare cases
-  // it may be useful on a one-to-one relation. If this is set to true, each call to
-  // DataLoader.load() will return an object instead of an array of objects
-  returnOne: false
 
   // set idLoaderKey to the registered name of an ID Loader to automatically
   // prime it with any results gathered
@@ -132,15 +128,15 @@ requires a special treatment from DataLoaderFactory that asks you for `extractKe
 import { DataLoaderFactory } from 'dataloader-factory'
 DataLoaderFactory.registerManyToMany('booksByGenreId', {
   fetch: async genreIds => {
-    return db.collection('books').find({ genreIds }).toArray() // mongodb client syntax
+    return db.collection('books').find({ genreIds: { $in: genreIds } }).toArray() // mongodb client syntax
   },
   extractKeys: book => book.genreIds
 })
 ```
 and the resolver
 ```javascript
-export const bookPagesResolver = (book, args, context) => {
-  return context.dataLoaderFactory.getManyToMany('booksByGenreId', args).load(book.id)
+export const genreBooksResolver = (genre, args, context) => {
+  return context.dataLoaderFactory.getManyToMany('booksByGenreId').load(genre.id)
 }
 ```
 Note that it is also possible to use a named intermediary in document-oriented databases. Depending on the database,
