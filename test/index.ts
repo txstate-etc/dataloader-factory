@@ -27,7 +27,6 @@ DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID_MATCHKEY, {
   matchKey: (key, item) => item.authorId === key
 })
 
-
 let byIdCount = 0
 const BOOKS_BY_ID = 'books'
 DataLoaderFactory.register(BOOKS_BY_ID, {
@@ -122,7 +121,7 @@ describe('bookloader', () => {
     expect(byAuthorIdCount).to.equal(2)
   })
   it('should have cached authorId fetches', async () => {
-    const cache = dataLoaderFactory.getFilteredcache(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
+    const cache = dataLoaderFactory.getFilteredCache(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
     expect(cache).to.have.length(6)
   })
   it('should load books with the ID dataloader', async () => {

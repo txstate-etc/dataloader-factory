@@ -31,10 +31,15 @@ export const bookAuthorResolver = (book, args, context) => {
 }
 ```
 ### Options
-`register` accepts more input:
+`register` accepts the following input:
 ```javascript
 {
-  fetch: ids => []
+  // the core batch function for DataLoader, DataLoaderFactory handles
+  // putting it back together in order
+  // 'context' is available in case you need any authorization information
+  // when accessing the database, this should be immutable for the entire
+  // duration of a graphql request, not different per resolver
+  fetch: (ids, context) => []
   // a function for extracting the id from each item returned by fetch
   // if not specified, it guesses with this default function
   extractId: item => item.id || item._id
@@ -42,6 +47,15 @@ export const bookAuthorResolver = (book, args, context) => {
   // see dataloader documentation for details
   options: DataLoader.Options
 }
+```
+To set the pass-through `context` mentioned above, pass it in when you construct each new `dataLoaderFactory`.
+```javascript
+new ApolloServer({
+  context: req => {
+    const userinfo = parseBearerToken(req.headers.authorization)
+    return { dataLoaderFactory: new DataLoaderFactory(userinfo) }
+  }
+})
 ```
 
 ## One-to-Many DataLoaders
@@ -82,7 +96,7 @@ noted in their section of the documentation.
   // accept arbitrary foreign keys and arbitrary arguments and return results
   // the keys MUST appear in the result objects so that your
   // extractKey function can retrieve them
-  fetch: async (keys, filters) => [] // required
+  fetch: async (keys, filters, context) => [] // required
 
   // function that can pull the foreign key out of the result object
   // must match the interface of the keys you're using in your fetch function
@@ -97,7 +111,8 @@ noted in their section of the documentation.
   // maxBatchSize to be passed to each DataLoader
   maxBatchSize: 1000
 
-  // cacheKeyFn to be passed to each DataLoader
+  // cacheKeyFn to be passed to each DataLoader, default is fast-json-stable-stringify
+  // which should be good for almost any case
   cacheKeyFn: key => stringify(key)
 
   // set idLoaderKey to the registered name of an ID Loader to automatically
