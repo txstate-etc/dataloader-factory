@@ -10,21 +10,21 @@ interface BaseManyLoaderConfig<KeyType, ReturnType> {
 }
 
 interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
-  fetch: (keys: KeyType[], filters?:FilterType, context?:ContextType) => Promise<ReturnType[]>
+  fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<ReturnType[]>
   extractKey?: (item:ReturnType) => KeyType
 }
 
 interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
-  fetch: (keys: KeyType[], filters?:FilterType, context?:ContextType) => Promise<{ key: KeyType, value: ReturnType }[]>
+  fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<{ key: KeyType, value: ReturnType }[]>
 }
 
 interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
-  fetch: (keys: KeyType[], filters?:FilterType, context?:ContextType) => Promise<ReturnType[]>
+  fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<ReturnType[]>
   extractKeys?: (item:ReturnType) => KeyType[]
 }
 
 interface LoaderConfig<KeyType, ReturnType, ContextType> {
-  fetch: (ids:KeyType[], context?: ContextType) => Promise<ReturnType[]>
+  fetch: (ids:KeyType[], context: ContextType) => Promise<ReturnType[]>
   extractId?: (item:ReturnType) => KeyType
   options?: DataLoader.Options<KeyType,ReturnType,string>
 }
@@ -43,9 +43,9 @@ export class DataLoaderFactory<ContextType> {
   private static filteredRegistry:{ [keys:string]: OneToManyLoaderConfig<any,any,any,any>|ManyToManyLoaderConfig<any,any,any,any>|ManyJoinedLoaderConfig<any,any,any,any> } = {}
   private loaders: { [keys:string]: DataLoader<any,any> }
   private filteredLoaders: { [keys:string]: { [keys:string]: FilteredStorageObject<any,any> }}
-  private context?: ContextType
+  private context: ContextType
 
-  constructor (context?: ContextType) {
+  constructor (context: ContextType = {} as ContextType) {
     this.loaders = {}
     this.filteredLoaders = {}
     this.context = context
