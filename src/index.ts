@@ -67,6 +67,7 @@ export class DataLoaderFactory<ContextType> {
   }
 
   static registerManyJoined<KeyType = any, ReturnType = any, FilterType = any, ContextType = any> (key: string, loader: ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>) {
+    (loader as any).joined = true // to help generateloader tell the difference later
     DataLoaderFactory.filteredRegistry[key] = loader
   }
 
@@ -135,10 +136,11 @@ export class DataLoaderFactory<ContextType> {
         dedupekeys[stringkeys[i]] = keys[i]
       }
       const items = await loaderConfig.fetch(Object.values(dedupekeys), filters, this.context)
-      if ('matchKey' in loaderConfig) {
-        this.prime(loaderConfig, items as ReturnType[])
-      } else {
+      if ((loaderConfig as any).joined) {
+        // private option in loaderConfig tells me the return type is the joined type
         this.prime(loaderConfig, (items as { key: KeyType, value: ReturnType }[]).map(item => item.value))
+      } else {
+        this.prime(loaderConfig, items as ReturnType[])
       }
 
       const grouped: { [keys:string]: ReturnType[]} = {}

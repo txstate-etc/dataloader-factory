@@ -58,7 +58,8 @@ DataLoaderFactory.registerManyToMany(BOOKS_BY_GENRE, {
     const books = allbooks.filter(book => book.genres.some((genre:string) => genres.includes(genre)))
     return books
   },
-  extractKeys: book => book.genres
+  extractKeys: book => book.genres,
+  idLoaderKey: BOOKS_BY_ID
 })
 const BOOKS_BY_GENRE_MATCHKEY = 'booksByGenreMatchKey'
 DataLoaderFactory.registerManyToMany(BOOKS_BY_GENRE_MATCHKEY, {
@@ -77,7 +78,8 @@ DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED, {
     const books = allbooks.filter(book => book.genres.some((genre:string) => genres.includes(genre)))
     // using [].concat because vscode/typescript was having fits about using .flat()
     return [].concat(...books.map(book => book.genres.map((g:any) => ({ key: g, value: book }))))
-  }
+  },
+  idLoaderKey: BOOKS_BY_ID
 })
 const BOOKS_BY_GENRE_JOINED_MATCHKEY = 'booksByGenreJoinedMatchKey'
 DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED_MATCHKEY, {
