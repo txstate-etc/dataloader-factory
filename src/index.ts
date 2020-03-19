@@ -38,6 +38,10 @@ function defaultId (item: any) {
   return item.id || item._id
 }
 
+function stringifyForMap (item: any) {
+  return stringify(item, {})
+}
+
 export class DataLoaderFactory<ContextType> {
   private static registry:{ [keys:string]: LoaderConfig<any,any,any> } = {}
   private static filteredRegistry:{ [keys:string]: OneToManyLoaderConfig<any,any,any,any>|ManyToManyLoaderConfig<any,any,any,any>|ManyJoinedLoaderConfig<any,any,any,any> } = {}
@@ -87,7 +91,7 @@ export class DataLoaderFactory<ContextType> {
         keyed[key] = item
         return keyed
       }, {})
-      return ids.map(stringify).map(id => keyed[id])
+      return ids.map(stringifyForMap).map(id => keyed[id])
     }, options || {})
   }
 
@@ -130,7 +134,7 @@ export class DataLoaderFactory<ContextType> {
   private generateFilteredLoader <KeyType, ReturnType, FilterType> (filters:any, loaderConfig:OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>|ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>|ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>):FilteredStorageObject<KeyType, ReturnType> {
     const cache = loaderConfig.skipCache ? undefined : new Map<string, Promise<ReturnType[]>>()
     const loader = new DataLoader<KeyType, ReturnType[], string>(async (keys:readonly KeyType[]):Promise<(Error | ReturnType[])[]> => {
-      const stringkeys:string[] = keys.map(stringify)
+      const stringkeys:string[] = keys.map(stringifyForMap)
       const dedupekeys:{ [keys:string]: KeyType } = {}
       for (let i = 0; i < keys.length; i++) {
         dedupekeys[stringkeys[i]] = keys[i]
