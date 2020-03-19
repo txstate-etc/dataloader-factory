@@ -39,7 +39,7 @@ function defaultId (item: any) {
 }
 
 function stringifyForMap (item: any) {
-  return stringify(item, {})
+  return stringify(item)
 }
 
 export class DataLoaderFactory<ContextType> {
