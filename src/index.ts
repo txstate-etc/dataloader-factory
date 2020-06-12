@@ -1,7 +1,7 @@
 import stringify from 'fast-json-stable-stringify'
 import DataLoader from 'dataloader'
 
-interface BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface BaseManyLoaderConfig<KeyType, ReturnType> {
   matchKey?: (key:KeyType, item:ReturnType) => boolean
   skipCache?: boolean
   maxBatchSize?: number
@@ -9,27 +9,27 @@ interface BaseManyLoaderConfig<KeyType, ReturnType> {
   idLoaderKey?: string
 }
 
-interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<ReturnType[]>
   extractKey?: (item:ReturnType) => KeyType
 }
 
-interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<{ key: KeyType, value: ReturnType }[]>
 }
 
-interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<ReturnType[]>
   extractKeys?: (item:ReturnType) => KeyType[]
 }
 
-interface LoaderConfig<KeyType, ReturnType, ContextType> {
+export interface LoaderConfig<KeyType, ReturnType, ContextType> {
   fetch: (ids:KeyType[], context: ContextType) => Promise<ReturnType[]>
   extractId?: (item:ReturnType) => KeyType
   options?: DataLoader.Options<KeyType,ReturnType,string>
 }
 
-interface FilteredStorageObject<KeyType, ReturnType> {
+export interface FilteredStorageObject<KeyType, ReturnType> {
   loader: DataLoader<KeyType,ReturnType[]>
   cache?: Map<string,Promise<ReturnType[]>>
 }
