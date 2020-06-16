@@ -2,36 +2,36 @@ import stringify from 'fast-json-stable-stringify'
 import DataLoader from 'dataloader'
 
 interface BaseManyLoaderConfig<KeyType, ReturnType> {
-  matchKey?: (key:KeyType, item:ReturnType) => boolean
+  matchKey?: (key: KeyType, item: ReturnType) => boolean
   skipCache?: boolean
   maxBatchSize?: number
-  cacheKeyFn?: (key:KeyType) => string
+  cacheKeyFn?: (key: KeyType) => string
   idLoaderKey?: string
 }
 
 interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
-  fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<ReturnType[]>
-  extractKey?: (item:ReturnType) => KeyType
+  fetch: (keys: KeyType[], filters: FilterType, context: ContextType) => Promise<ReturnType[]>
+  extractKey?: (item: ReturnType) => KeyType
 }
 
 interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
-  fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<{ key: KeyType, value: ReturnType }[]>
+  fetch: (keys: KeyType[], filters: FilterType, context: ContextType) => Promise<{ key: KeyType, value: ReturnType }[]>
 }
 
 interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
-  fetch: (keys: KeyType[], filters:FilterType, context:ContextType) => Promise<ReturnType[]>
-  extractKeys?: (item:ReturnType) => KeyType[]
+  fetch: (keys: KeyType[], filters: FilterType, context: ContextType) => Promise<ReturnType[]>
+  extractKeys?: (item: ReturnType) => KeyType[]
 }
 
 interface LoaderConfig<KeyType, ReturnType, ContextType> {
-  fetch: (ids:KeyType[], context: ContextType) => Promise<ReturnType[]>
-  extractId?: (item:ReturnType) => KeyType
-  options?: DataLoader.Options<KeyType,ReturnType,string>
+  fetch: (ids: KeyType[], context: ContextType) => Promise<ReturnType[]>
+  extractId?: (item: ReturnType) => KeyType
+  options?: DataLoader.Options<KeyType, ReturnType, string>
 }
 
 interface FilteredStorageObject<KeyType, ReturnType> {
-  loader: DataLoader<KeyType,ReturnType[]>
-  cache?: Map<string,Promise<ReturnType[]>>
+  loader: DataLoader<KeyType, ReturnType[]>
+  cache?: Map<string, Promise<ReturnType[]>>
 }
 
 function defaultId (item: any) {
@@ -43,10 +43,10 @@ function stringifyForMap (item: any) {
 }
 
 export class DataLoaderFactory<ContextType> {
-  private static registry:{ [keys:string]: LoaderConfig<any,any,any> } = {}
-  private static filteredRegistry:{ [keys:string]: OneToManyLoaderConfig<any,any,any,any>|ManyToManyLoaderConfig<any,any,any,any>|ManyJoinedLoaderConfig<any,any,any,any> } = {}
-  private loaders: { [keys:string]: DataLoader<any,any> }
-  private filteredLoaders: { [keys:string]: { [keys:string]: FilteredStorageObject<any,any> }}
+  private static registry: { [keys: string]: LoaderConfig<any, any, any> } = {}
+  private static filteredRegistry: { [keys: string]: OneToManyLoaderConfig<any, any, any, any>|ManyToManyLoaderConfig<any, any, any, any>|ManyJoinedLoaderConfig<any, any, any, any> } = {}
+  private loaders: { [keys: string]: DataLoader<any, any> }
+  private filteredLoaders: { [keys: string]: { [keys: string]: FilteredStorageObject<any, any> }}
   private context: ContextType
 
   constructor (context: ContextType = {} as ContextType) {
@@ -55,7 +55,7 @@ export class DataLoaderFactory<ContextType> {
     this.context = context
   }
 
-  static register<KeyType = any, ReturnType = any, ContextType = any> (key:string, loaderConfig:LoaderConfig<KeyType,ReturnType,ContextType>) {
+  static register<KeyType = any, ReturnType = any, ContextType = any> (key: string, loaderConfig: LoaderConfig<KeyType, ReturnType, ContextType>) {
     DataLoaderFactory.registry[key] = loaderConfig
   }
 
@@ -75,18 +75,19 @@ export class DataLoaderFactory<ContextType> {
     DataLoaderFactory.filteredRegistry[key] = loader
   }
 
-  get<KeyType = any, ReturnType = any> (key:string):DataLoader<KeyType,ReturnType,string> {
+  get<KeyType = any, ReturnType = any> (key: string): DataLoader<KeyType, ReturnType, string> {
     const loaderConfig = DataLoaderFactory.registry[key]
     if (!loaderConfig) throw new Error('Called DataLoaderFactory.get() with an unregistered key.')
     if (!this.loaders[key]) this.loaders[key] = this.generateIdLoader(loaderConfig)
     return this.loaders[key]
   }
-  private generateIdLoader <KeyType, ReturnType>(loaderConfig:LoaderConfig<KeyType,ReturnType,ContextType>):DataLoader<KeyType,ReturnType,string> {
-    const options = loaderConfig.options || {}
-    if (!options.maxBatchSize) options.maxBatchSize = 1000
-    return new DataLoader<KeyType,ReturnType,string>(async (ids:readonly any[]):Promise<any[]> => {
+
+  private generateIdLoader <KeyType, ReturnType>(loaderConfig: LoaderConfig<KeyType, ReturnType, ContextType>): DataLoader<KeyType, ReturnType, string> {
+    const options = loaderConfig.options ?? {}
+    options.maxBatchSize = options.maxBatchSize ?? 1000
+    return new DataLoader<KeyType, ReturnType, string>(async (ids: readonly any[]): Promise<any[]> => {
       const items = await loaderConfig.fetch(ids as any[], this.context)
-      const keyed = items.reduce((keyed:any, item) => {
+      const keyed = items.reduce((keyed: any, item) => {
         const key = stringify(loaderConfig.extractId ? loaderConfig.extractId(item) : defaultId(item))
         keyed[key] = item
         return keyed
@@ -113,7 +114,7 @@ export class DataLoaderFactory<ContextType> {
     return this.getOneToMany(key, filters)
   }
 
-  getFilteredCache (key:string, filters:any):Map<string,any>|undefined {
+  getFilteredCache (key: string, filters: any): Map<string, any>|undefined {
     const filterkey = stringify(filters)
     return ((this.filteredLoaders[key] || {})[filterkey] || {}).cache
   }
@@ -131,11 +132,11 @@ export class DataLoaderFactory<ContextType> {
     }
   }
 
-  private generateFilteredLoader <KeyType, ReturnType, FilterType> (filters:any, loaderConfig:OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>|ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>|ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>):FilteredStorageObject<KeyType, ReturnType> {
+  private generateFilteredLoader <KeyType, ReturnType, FilterType> (filters: any, loaderConfig: OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>|ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>|ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>): FilteredStorageObject<KeyType, ReturnType> {
     const cache = loaderConfig.skipCache ? undefined : new Map<string, Promise<ReturnType[]>>()
-    const loader = new DataLoader<KeyType, ReturnType[], string>(async (keys:readonly KeyType[]):Promise<(Error | ReturnType[])[]> => {
-      const stringkeys:string[] = keys.map(stringifyForMap)
-      const dedupekeys:{ [keys:string]: KeyType } = {}
+    const loader = new DataLoader<KeyType, ReturnType[], string>(async (keys: readonly KeyType[]): Promise<(Error | ReturnType[])[]> => {
+      const stringkeys: string[] = keys.map(stringifyForMap)
+      const dedupekeys: { [keys: string]: KeyType } = {}
       for (let i = 0; i < keys.length; i++) {
         dedupekeys[stringkeys[i]] = keys[i]
       }
@@ -147,21 +148,21 @@ export class DataLoaderFactory<ContextType> {
         this.prime(loaderConfig, items as ReturnType[])
       }
 
-      const grouped: { [keys:string]: ReturnType[]} = {}
-      const addtogrouped = (key: any, item:any) => {
+      const grouped: { [keys: string]: ReturnType[]} = {}
+      const addtogrouped = (key: any, item: any) => {
         const keystr = stringify(key)
         if (!grouped[keystr]) grouped[keystr] = []
         grouped[keystr].push(item)
       }
       for (const item of items) {
         if ('extractKey' in loaderConfig && loaderConfig.extractKey) {
-          let key = loaderConfig.extractKey(item as ReturnType)
+          const key = loaderConfig.extractKey(item as ReturnType)
           addtogrouped(key, item)
         } else if ('extractKeys' in loaderConfig && loaderConfig.extractKeys) {
-          let keys = loaderConfig.extractKeys(item as ReturnType)
+          const keys = loaderConfig.extractKeys(item as ReturnType)
           for (const key of keys) addtogrouped(key, item)
         } else if ('matchKey' in loaderConfig && loaderConfig.matchKey) {
-          const actualitem = 'key' in item && 'value' in item ? item.value : item as ReturnType
+          const actualitem = 'key' in item && 'value' in item ? item.value : item
           for (const key of Object.values(dedupekeys)) {
             if (loaderConfig.matchKey(key, actualitem)) addtogrouped(key, actualitem)
           }
@@ -171,10 +172,10 @@ export class DataLoaderFactory<ContextType> {
       }
       return stringkeys.map(key => grouped[key] || [])
     }, {
-      cacheKeyFn: loaderConfig.cacheKeyFn || stringify,
+      cacheKeyFn: loaderConfig.cacheKeyFn ?? stringify,
       cache: !loaderConfig.skipCache,
       cacheMap: cache,
-      maxBatchSize: loaderConfig.maxBatchSize || 1000
+      maxBatchSize: loaderConfig.maxBatchSize ?? 1000
     })
     return { loader, cache }
   }

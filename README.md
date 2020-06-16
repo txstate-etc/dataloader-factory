@@ -48,7 +48,8 @@ export const bookAuthorResolver = (book, args, context) => {
   options: DataLoader.Options
 }
 ```
-To set the pass-through `context` mentioned above, pass it in when you construct each new `dataLoaderFactory`.
+To set the pass-through `context` mentioned for the `fetch` function above, pass it in when you construct
+each new `dataLoaderFactory`.
 ```javascript
 new ApolloServer({
   context: req => {
