@@ -302,7 +302,7 @@ DataLoaderFactory.registerOneToMany('booksAfterYear', {
 ```
 
 ## TypeScript
-This library is written in typescript and provides its own types. When you use the `register` and `get` methods (or the filtered versions), you may specify the KeyType and ReturnType as generics.
+This library is written in typescript and provides its own types. When you use the `register` method (or the *ToMany versions), you may specify the KeyType and ReturnType as generics.
 ```javascript
 DataLoaderFactory.register<string, IBook>('books', {
   fetch: (ids) => { // typescript should know you'll receive string[]
@@ -313,8 +313,38 @@ DataLoaderFactory.register<string, IBook>('books', {
   }
 })
 ```
-```javascript
-// typescript now knows .get() returns a DataLoader<string, IBook> so your .load()
-// will return an IBook
-dataLoaderFactory.get<string, IBook>('books').load(id)
+When you need to retrieve a dataloader, there are two options. The quick one-off way is to specify KeyType and ReturnType as generics
+on the get* functions:
+```typescript
+// typescript now knows .get() returns DataLoader<string, IBook|undefined>
+const book = await dataLoaderFactory.get<string, IBook>('books').load(id)
+```
+**NOTE**: We assume that any lookup could fail to find the id, so `book` is typed as `IBook|undefined`.
+
+A potentially better way to handle types is to subclass DataLoaderFactory somewhere in your codebase and use it to initialize your context:
+```typescript
+class TypedDataLoaderFactory extends DataLoaderFactory {
+  get booksById () { return this.get<string, IBook>('books') }
+}
+
+new ApolloServer({
+  context: req => {
+    return { dataLoaderFactory: new TypedDataLoaderFactory() }
+  }
+})
+
+export const bookResolver = (book, args, context) => {
+  return context.dataLoaderFactory.booksById.load(book.authorId)
+}
+```
+DataLoaderFactory provides extra *ToMany functions to make doing this with array loaders a little easier:
+```typescript
+class TypedDataLoaderFactory extends DataLoaderFactory {
+  // typedOneToMany returns a function that takes filters as its argument, so that the usage is as shown below
+  get booksByAuthorId () { return this.typedOneToMany<string, IBook, BookFilters>('booksByAuthorId') }
+}
+
+export const AuthorBooksResolver = (author, args, context) => {
+  return context.dataLoaderFactory.booksByAuthorId(args).load(book.authorId)
+}
 ```

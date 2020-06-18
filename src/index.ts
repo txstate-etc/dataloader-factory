@@ -30,7 +30,7 @@ interface LoaderConfig<KeyType, ReturnType, ContextType> {
 }
 
 interface FilteredStorageObject<KeyType, ReturnType> {
-  loader: DataLoader<KeyType, ReturnType[]>
+  loader: DataLoader<KeyType, ReturnType[], string>
   cache?: Map<string, Promise<ReturnType[]>>
 }
 
@@ -42,10 +42,10 @@ function stringifyForMap (item: any) {
   return stringify(item)
 }
 
-export class DataLoaderFactory<ContextType> {
+export class DataLoaderFactory<ContextType = undefined> {
   private static registry: { [keys: string]: LoaderConfig<any, any, any> } = {}
   private static filteredRegistry: { [keys: string]: OneToManyLoaderConfig<any, any, any, any>|ManyToManyLoaderConfig<any, any, any, any>|ManyJoinedLoaderConfig<any, any, any, any> } = {}
-  private loaders: { [keys: string]: DataLoader<any, any> }
+  private loaders: { [keys: string]: DataLoader<any, any, string> }
   private filteredLoaders: { [keys: string]: { [keys: string]: FilteredStorageObject<any, any> }}
   private context: ContextType
 
@@ -75,7 +75,7 @@ export class DataLoaderFactory<ContextType> {
     DataLoaderFactory.filteredRegistry[key] = loader
   }
 
-  get<KeyType = any, ReturnType = any> (key: string): DataLoader<KeyType, ReturnType, string> {
+  get<KeyType = any, ReturnType = any> (key: string): DataLoader<KeyType, ReturnType|undefined, string> {
     const loaderConfig = DataLoaderFactory.registry[key]
     if (!loaderConfig) throw new Error('Called DataLoaderFactory.get() with an unregistered key.')
     if (!this.loaders[key]) this.loaders[key] = this.generateIdLoader(loaderConfig)
@@ -96,7 +96,7 @@ export class DataLoaderFactory<ContextType> {
     }, options || {})
   }
 
-  getOneToMany<KeyType = any, ReturnType = any, FilterType = any> (key: string, filters: FilterType = {} as FilterType): DataLoader<KeyType, ReturnType[]> {
+  getOneToMany<KeyType = any, ReturnType = any, FilterType = any> (key: string, filters: FilterType = {} as FilterType): DataLoader<KeyType, ReturnType[], string> {
     const loaderConfig = DataLoaderFactory.filteredRegistry[key]
     if (!loaderConfig) throw new Error('Tried to retrieve a dataloader from DataLoaderFactory with an unregistered key.')
     if (!this.filteredLoaders[key]) this.filteredLoaders[key] = {}
@@ -106,11 +106,11 @@ export class DataLoaderFactory<ContextType> {
     return filtered[filterkey].loader
   }
 
-  getManyToMany<KeyType = any, ReturnType = any, FilterType = any> (key: string, filters: FilterType = {} as FilterType): DataLoader<KeyType, ReturnType[]> {
+  getManyToMany<KeyType = any, ReturnType = any, FilterType = any> (key: string, filters: FilterType = {} as FilterType): DataLoader<KeyType, ReturnType[], string> {
     return this.getOneToMany(key, filters)
   }
 
-  getManyJoined<KeyType = any, ReturnType = any, FilterType = any> (key: string, filters: FilterType = {} as FilterType): DataLoader<KeyType, ReturnType[]> {
+  getManyJoined<KeyType = any, ReturnType = any, FilterType = any> (key: string, filters: FilterType = {} as FilterType): DataLoader<KeyType, ReturnType[], string> {
     return this.getOneToMany(key, filters)
   }
 
@@ -178,5 +178,17 @@ export class DataLoaderFactory<ContextType> {
       maxBatchSize: loaderConfig.maxBatchSize ?? 1000
     })
     return { loader, cache }
+  }
+
+  protected typedOneToMany <KeyType, ReturnType, FilterType = any> (key: string) {
+    return (filters?: FilterType) => this.getOneToMany<KeyType, ReturnType>(key, filters)
+  }
+
+  protected typedManyToMany <KeyType, ReturnType, FilterType = any> (key: string) {
+    return (filters?: FilterType) => this.getManyToMany<KeyType, ReturnType>(key, filters)
+  }
+
+  protected typedManyJoined <KeyType, ReturnType, FilterType = any> (key: string) {
+    return (filters?: FilterType) => this.getManyJoined<KeyType, ReturnType>(key, filters)
   }
 }
