@@ -4,13 +4,12 @@
       "project": "./tsconfig.eslint.json"
   },
   "rules": {
+    "@typescript-eslint/array-type": "off",
     "@typescript-eslint/consistent-type-assertions": ["error", { "assertionStyle": "as" }],
     "@typescript-eslint/explicit-function-return-type": "off",
-    "@typescript-eslint/array-type": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
     "@typescript-eslint/prefer-readonly": "off",
-    "@typescript-eslint/require-await": "off",
-    "@typescript-eslint/return-await": ["error", "in-try-catch"],
+    "@typescript-eslint/return-await": ["error", "always"],
     "@typescript-eslint/strict-boolean-expressions": "off"
   }
 }

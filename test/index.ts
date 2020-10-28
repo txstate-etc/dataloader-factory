@@ -18,9 +18,9 @@ interface Book {
 
 async function getData (type: 'books'): Promise<Book[]>
 async function getData (type: 'authors'): Promise<Author[]>
-async function getData (type: string): Promise<any[]> {
+async function getData (type: string) {
   const ymlstring = await fsp.readFile(`test/data/${type}.yml`, 'utf-8')
-  return yaml.safeLoad(ymlstring)
+  return yaml.safeLoad(ymlstring) as any[]
 }
 
 let byAuthorIdCount = 0
@@ -126,9 +126,8 @@ describe('bookloader', () => {
   })
   it('should be able to load books by authorId', async () => {
     const loader = dataLoaderFactory.booksByAuthorId({ genre: 'mystery' })
-    const authoryml = await fsp.readFile('test/data/authors.yml', 'utf-8')
-    const authors = yaml.safeLoad(authoryml)
-    const authorBooks = await Promise.all<any>(authors.map(async (a: any) => loader.load(a.id)))
+    const authors = await getData('authors')
+    const authorBooks = await Promise.all<any>(authors.map(async (a: any) => await loader.load(a.id)))
     expect(byAuthorIdCount).to.equal(1)
     expect(authorBooks).to.have.length(6)
     for (const books of authorBooks) {
@@ -159,7 +158,7 @@ describe('bookloader', () => {
     expect(book!.id).to.equal(2)
   })
   it('should load multiple books with the ID dataloader and keep them in order', async () => {
-    const twobooks = await Promise.all([4, 3].map(async id => dataLoaderFactory.booksById.load(id)))
+    const twobooks = await Promise.all([4, 3].map(async id => await dataLoaderFactory.get(BOOKS_BY_ID).load(id)))
     expect(byIdCount).to.equal(2)
     expect(twobooks).to.have.length(2)
     expect(twobooks[0]!.id).to.equal(4)
