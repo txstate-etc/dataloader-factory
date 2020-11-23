@@ -40,9 +40,19 @@ export const bookAuthorResolver = (book, args, context) => {
   // when accessing the database, this should be immutable for the entire
   // duration of a graphql request, not different per resolver
   fetch: (ids, context) => []
+
   // a function for extracting the id from each item returned by fetch
   // if not specified, it guesses with this default function
   extractId: item => item.id || item._id
+
+  // set idLoaderKey to the registered name of another ID Loader to automatically
+  // prime it with any results gathered
+  // NOTE: if your fetch function returns result objects that differ from those of
+  // the other loader, it's going to cause you problems
+  idLoaderKey: 'books'
+  // OR
+  idLoaderKey: ['books', 'booksBySomeOtherUniqueId'] // primes two different ID loaders
+
   // the options object to pass to dataloader upon creation
   // see dataloader documentation for details
   options: DataLoader.Options
@@ -121,6 +131,8 @@ noted in their section of the documentation.
   // NOTE: if your fetch function returns result objects that differ from those of
   // your ID Loader, it's going to cause you problems
   idLoaderKey: 'books'
+  // OR
+  idLoaderKey: ['books', 'booksBySomeOtherUniqueId'] // primes two different loaders
 }
 ```
 

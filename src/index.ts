@@ -6,7 +6,7 @@ export interface BaseManyLoaderConfig<KeyType, ReturnType> {
   skipCache?: boolean
   maxBatchSize?: number
   cacheKeyFn?: (key: KeyType) => string
-  idLoaderKey?: string
+  idLoaderKey?: string|string[]
 }
 
 export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
@@ -26,6 +26,7 @@ interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> e
 export interface LoaderConfig<KeyType, ReturnType, ContextType> {
   fetch: (ids: KeyType[], context: ContextType) => Promise<ReturnType[]>
   extractId?: (item: ReturnType) => KeyType
+  idLoaderKey?: string|string[]
   options?: DataLoader.Options<KeyType, ReturnType, string>
 }
 
@@ -83,6 +84,7 @@ export class DataLoaderFactory<ContextType = undefined> {
     options.maxBatchSize = options.maxBatchSize ?? 1000
     return new DataLoader<KeyType, ReturnType, string>(async (ids: readonly any[]): Promise<any[]> => {
       const items = await loaderConfig.fetch(ids as any[], this.context)
+      this.prime(loaderConfig, items)
       const keyed = items.reduce((keyed: any, item) => {
         const key = stringify(loaderConfig.extractId ? loaderConfig.extractId(item) : defaultId(item))
         keyed[key] = item
@@ -115,11 +117,14 @@ export class DataLoaderFactory<ContextType = undefined> {
     return ((this.filteredLoaders[key] || {})[filterkey] || {}).cache
   }
 
-  private prime<KeyType, ReturnType> (loaderConfig: BaseManyLoaderConfig<KeyType, ReturnType>, items: ReturnType[]) {
-    if (loaderConfig.idLoaderKey) {
-      const idLoader = this.get(loaderConfig.idLoaderKey)
+  private prime<KeyType, ReturnType> (loaderConfig: BaseManyLoaderConfig<KeyType, ReturnType>|LoaderConfig<KeyType, ReturnType, ContextType>, items: ReturnType[]) {
+    const loaderKeys = Array.isArray(loaderConfig.idLoaderKey)
+      ? loaderConfig.idLoaderKey
+      : loaderConfig.idLoaderKey ? [loaderConfig.idLoaderKey] : []
+    for (const loaderKey of loaderKeys) {
+      const idLoader = this.get(loaderKey)
       if (idLoader) {
-        const idLoaderConfig = DataLoaderFactory.registry[loaderConfig.idLoaderKey]
+        const idLoaderConfig = DataLoaderFactory.registry[loaderKey]
         for (const item of items) {
           const id = idLoaderConfig.extractId ? idLoaderConfig.extractId(item) : defaultId(item)
           if (id) idLoader.prime(id, item)

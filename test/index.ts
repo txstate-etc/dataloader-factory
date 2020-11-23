@@ -45,12 +45,14 @@ DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID_MATCHKEY, {
 
 let byIdCount = 0
 const BOOKS_BY_ID = 'books'
+const booksCache = new Map()
 DataLoaderFactory.register<number, Book>(BOOKS_BY_ID, {
   fetch: async ids => {
     byIdCount += 1
     const allbooks = await getData('books')
     return allbooks.filter(book => ids.includes(book.id))
-  }
+  },
+  options: { cacheMap: booksCache }
 })
 
 const BOOKS_BY_ID_AND_TITLE = 'booksByIdAndTitle'
@@ -94,7 +96,7 @@ DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED, {
     const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
     return books.flatMap(book => book.genres.map((g: any) => ({ key: g, value: book })))
   },
-  idLoaderKey: BOOKS_BY_ID
+  idLoaderKey: [BOOKS_BY_ID]
 })
 
 const BOOKS_BY_GENRE_JOINED_MATCHKEY = 'booksByGenreJoinedMatchKey'
@@ -176,19 +178,23 @@ describe('bookloader', () => {
   })
 
   it('should support many to many, i.e. extractKey returns an array', async () => {
+    booksCache.clear()
     const books = await dataLoaderFactory.booksByGenre().load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))
     }
+    expect(booksCache).to.have.lengthOf(2)
   })
 
   it('should work with the manyJoined pattern', async () => {
+    booksCache.clear()
     const books = await dataLoaderFactory.booksByGenreJoined().load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))
     }
+    expect(booksCache).to.have.lengthOf(2)
   })
   it('should support matchKey in one-to-many pattern', async () => {
     const books = await dataLoaderFactory.booksByAuthorIdMatchKey({ genre: 'mystery' }).load(2)
