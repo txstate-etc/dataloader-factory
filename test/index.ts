@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import yaml from 'js-yaml'
 import { promises as fsp } from 'fs'
-import { DataLoaderFactory } from '../src/index'
+import { DataLoaderFactory, ManyToManyLoader, PrimaryKeyLoader } from '../src/index'
 import { expect } from 'chai'
 
 interface Author {
@@ -120,6 +120,25 @@ class DataLoaderTyped extends DataLoaderFactory {
   get booksByGenreJoinedMatchKey () { return this.typedManyToMany<string, Book>(BOOKS_BY_GENRE_JOINED_MATCHKEY) }
 }
 
+const bookLoader = new PrimaryKeyLoader({
+  fetch: async (ids: number[]) => {
+    byIdCount += 1
+    const allbooks = await getData('books')
+    return allbooks.filter(book => ids.includes(book.id))
+  },
+  options: { cacheMap: booksCache }
+})
+
+const genreLoader = new ManyToManyLoader({
+  fetch: async (genres: string[]) => {
+    const allbooks = await getData('books')
+    const books = allbooks.filter(book => book.genres.some(genre => genres.includes(genre)))
+    return books
+  },
+  extractKeys: book => book.genres,
+  idLoader: bookLoader
+})
+
 describe('bookloader', () => {
   const dataLoaderFactory = new DataLoaderTyped()
   before(() => {
@@ -212,6 +231,20 @@ describe('bookloader', () => {
   })
   it('should support matchKey in many-to-many-joined pattern', async () => {
     const books = await dataLoaderFactory.booksByGenreJoinedMatchKey().load('mystery')
+    expect(books).to.have.length(2)
+    for (const book of books) {
+      expect(book.genres.includes('mystery'))
+    }
+  })
+  it('should support the new typesafe way of doing things', async () => {
+    const book = await dataLoaderFactory.get(bookLoader).load(2)
+    expect(book).to.exist
+    expect(book!.id).to.equal(2)
+  })
+  it('should support the new typesafe way for many to many', async () => {
+    booksCache.clear()
+    const books = await dataLoaderFactory.getMany(genreLoader).load('mystery')
+    expect(booksCache).to.have.lengthOf(2)
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))

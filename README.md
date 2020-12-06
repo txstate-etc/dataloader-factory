@@ -7,7 +7,7 @@ take care of caching the DataLoaders and also helps with putting the results bac
 order, since that is usually required to make DataLoader work.
 
 ## Basic Usage (Load by Primary Key)
-Fetching logic must be registered with the factory class at load time (register is a static method):
+Fetching logic must be registered with the factory class at startup (register is a static method):
 ```javascript
 import { DataLoaderFactory } from 'dataloader-factory'
 DataLoaderFactory.register('authors', {
@@ -33,7 +33,7 @@ export const bookAuthorResolver = (book, args, context) => {
 ### Options
 `register` accepts the following input:
 ```javascript
-{
+DataLoaderFactory.register('anyuniquestring', {
   // the core batch function for DataLoader, DataLoaderFactory handles
   // putting it back together in order
   // 'context' is available in case you need any authorization information
@@ -53,10 +53,13 @@ export const bookAuthorResolver = (book, args, context) => {
   // OR
   idLoaderKey: ['books', 'booksBySomeOtherUniqueId'] // primes two different ID loaders
 
+  // same as idLoaderKey but accepts instance(s) of PrimaryKeyLoader (see typescript section below)
+  idLoader: bookLoader
+
   // the options object to pass to dataloader upon creation
   // see dataloader documentation for details
   options: DataLoader.Options
-}
+})
 ```
 To set the pass-through `context` mentioned for the `fetch` function above, pass it in when you construct
 each new `dataLoaderFactory`.
@@ -103,7 +106,7 @@ for efficiency (see the "Many-to-Many-Joined" section below).
 `registerOneToMany` accepts the following inputs. All of the *-to-many patterns accept the same options, except as
 noted in their section of the documentation.
 ```javascript
-{
+DataLoaderFactory.registerOneToMany('anotheruniquestring', {
   // accept arbitrary foreign keys and arbitrary arguments and return results
   // the keys MUST appear in the result objects so that your
   // extractKey function can retrieve them
@@ -133,7 +136,10 @@ noted in their section of the documentation.
   idLoaderKey: 'books'
   // OR
   idLoaderKey: ['books', 'booksBySomeOtherUniqueId'] // primes two different loaders
-}
+
+  // same as idLoaderKey but accepts instance(s) of PrimaryKeyLoader (see typescript section below)
+  idLoader: bookLoader
+})
 ```
 
 ## Many-to-Many DataLoaders
@@ -317,7 +323,7 @@ DataLoaderFactory.registerOneToMany('booksAfterYear', {
 This library is written in typescript and provides its own types. When you use the `register` method (or the *ToMany versions), you may specify the KeyType and ReturnType as generics.
 ```javascript
 DataLoaderFactory.register<string, IBook>('books', {
-  fetch: (ids) => { // typescript should know you'll receive string[]
+  fetch: async ids => { // typescript should know you'll receive string[]
     ... // typescript should know you need to return IBook[]
   },
   extractId: (item) => { // typescript should know you'll receive IBook
@@ -333,30 +339,32 @@ const book = await dataLoaderFactory.get<string, IBook>('books').load(id)
 ```
 **NOTE**: We assume that any lookup could fail to find the id, so `book` is typed as `IBook|undefined`.
 
-A potentially better way to handle types is to subclass DataLoaderFactory somewhere in your codebase and use it to initialize your context:
+A better way to handle types is to swap out your `register` calls with the suite of type-safe loader
+classes that are provided:
 ```typescript
-class TypedDataLoaderFactory extends DataLoaderFactory {
-  get booksById () { return this.get<string, IBook>('books') }
-}
-
-new ApolloServer({
-  context: req => {
-    return { dataLoaderFactory: new TypedDataLoaderFactory() }
+import { PrimaryKeyLoader } from 'dataloader-factory'
+const bookLoader = new PrimaryKeyLoader({
+  fetch: async (ids: string[]) => { // provide the key type either here or as a generic to PrimaryKeyLoader
+    ... // return type will infer based on what you return here, or you can set it as a generic to PrimaryKeyLoader
+  },
+  extractId: (item) => { // typescript should know you'll receive IBook
+    ... // typescript should know you need to return string
   }
 })
 
 export const bookResolver = (book, args, context) => {
-  return context.dataLoaderFactory.booksById.load(book.authorId)
+  // typescript should know load() accepts a string
+  return context.dataLoaderFactory.get(bookLoader).load(book.authorId)
 }
 ```
-DataLoaderFactory provides extra *ToMany functions to make doing this with array loaders a little easier:
+The *ToMany classes are provided as well:
 ```typescript
-class TypedDataLoaderFactory extends DataLoaderFactory {
-  // typedOneToMany returns a function that takes filters as its argument, so that the usage is as shown below
-  get booksByAuthorId () { return this.typedOneToMany<string, IBook, BookFilters>('booksByAuthorId') }
-}
-
-export const AuthorBooksResolver = (author, args, context) => {
-  return context.dataLoaderFactory.booksByAuthorId(args).load(book.authorId)
+import { OneToManyLoader, ManyToManyLoader, ManyJoinedLoader } from 'dataloader-factory'
+```
+After making any of the three *ToMany classes, you can then use `getMany(loader, filters)` instead of `getOneToMany`, `getManyToMany`, and `getManyJoined`:
+```typescript
+export const authorBooksResolver = (author, args, context) => {
+  // this next line is type-safe: args and author.id will both be checked and load will return Promise<IBook>
+  return context.dataLoaderFactory.getMany(authorBooksLoader, args).load(author.id)
 }
 ```
