@@ -10,15 +10,20 @@ export interface BaseManyLoaderConfig<KeyType, ReturnType> {
   idLoaderKey?: string|string[]
   idLoader?: PrimaryKeyLoader<any, ReturnType, any>|PrimaryKeyLoader<any, ReturnType, any>[]
 }
+abstract class BaseManyLoader {
+  registrationKey: string
+  constructor (registrationKey?: string) {
+    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
+  }
+}
 
 export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters: FilterType, context: ContextType) => Promise<ReturnType[]>
   extractKey?: (item: ReturnType) => KeyType
 }
-export class OneToManyLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> {
-  registrationKey: string
+export class OneToManyLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> extends BaseManyLoader {
   constructor (config: OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>, registrationKey?: string) {
-    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
+    super(registrationKey)
     DataLoaderFactory.registerOneToMany(this.registrationKey, config)
   }
 }
@@ -26,10 +31,9 @@ export class OneToManyLoader<KeyType = never, ReturnType = never, FilterType = u
 export interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters: FilterType, context: ContextType) => Promise<{ key: KeyType, value: ReturnType }[]>
 }
-export class ManyJoinedLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> {
-  registrationKey: string
+export class ManyJoinedLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> extends BaseManyLoader {
   constructor (config: ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>, registrationKey?: string) {
-    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
+    super(registrationKey)
     DataLoaderFactory.registerManyJoined(this.registrationKey, config)
   }
 }
@@ -38,10 +42,9 @@ interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> e
   fetch: (keys: KeyType[], filters: FilterType, context: ContextType) => Promise<ReturnType[]>
   extractKeys?: (item: ReturnType) => KeyType[]
 }
-export class ManyToManyLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> {
-  registrationKey: string
+export class ManyToManyLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> extends BaseManyLoader {
   constructor (config: ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>, registrationKey?: string) {
-    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
+    super(registrationKey)
     DataLoaderFactory.registerManyToMany(this.registrationKey, config)
   }
 }
@@ -52,6 +55,10 @@ export interface LoaderConfig<KeyType, ReturnType, ContextType> {
   idLoaderKey?: string|string[]
   idLoader?: PrimaryKeyLoader<any, ReturnType, any>|PrimaryKeyLoader<any, ReturnType, any>[]
   options?: DataLoader.Options<KeyType, ReturnType, string>
+}
+interface LoaderConfigInternal<KeyType, ReturnType, ContextType> extends LoaderConfig<KeyType, ReturnType, ContextType> {
+  idLoaderKey: string[]
+  extractId: (item: ReturnType) => KeyType
 }
 export class PrimaryKeyLoader<KeyType = never, ReturnType = never, ContextType = undefined> {
   registrationKey: string
@@ -71,38 +78,39 @@ function defaultId (item: any) {
 }
 
 export class DataLoaderFactory<ContextType = undefined> {
-  private static registry: { [keys: string]: LoaderConfig<any, any, any> } = {}
+  private static registry: { [keys: string]: LoaderConfigInternal<any, any, any> } = {}
   private static filteredRegistry: { [keys: string]: OneToManyLoaderConfig<any, any, any, any>|ManyToManyLoaderConfig<any, any, any, any>|ManyJoinedLoaderConfig<any, any, any, any> } = {}
-  private loaders: { [keys: string]: DataLoader<any, any, string> }
-  private filteredLoaders: { [keys: string]: { [keys: string]: FilteredStorageObject<any, any> }}
+  private loaders: Map<string|PrimaryKeyLoader, DataLoader<any, any, string>>
+  private filteredLoaders: Map<string|BaseManyLoader, { [keys: string]: FilteredStorageObject<any, any> }>
   private context: ContextType
 
   constructor (context?: ContextType) {
-    this.loaders = {}
-    this.filteredLoaders = {}
+    this.loaders = new Map()
+    this.filteredLoaders = new Map()
     this.context = context ?? {} as any
   }
 
   static register<KeyType = any, ReturnType = any, ContextType = any> (key: string, loaderConfig: LoaderConfig<KeyType, ReturnType, ContextType>) {
-    if (loaderConfig.idLoader) loaderConfig.idLoaderKey = [...toArray(loaderConfig.idLoaderKey), ...toArray(loaderConfig.idLoader).map(l => l.registrationKey)]
-    DataLoaderFactory.registry[key] = loaderConfig
+    loaderConfig.idLoaderKey = [...toArray(loaderConfig.idLoaderKey), ...toArray(loaderConfig.idLoader).map(l => l.registrationKey)]
+    loaderConfig.extractId ??= defaultId
+    DataLoaderFactory.registry[key] = loaderConfig as LoaderConfigInternal<KeyType, ReturnType, ContextType>
   }
 
   static registerOneToMany<KeyType = any, ReturnType = any, FilterType = any, ContextType = any> (key: string, loader: OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>) {
-    if (loader.idLoader) loader.idLoaderKey = [...toArray(loader.idLoaderKey), ...toArray(loader.idLoader).map(l => l.registrationKey)]
+    loader.idLoaderKey = [...toArray(loader.idLoaderKey), ...toArray(loader.idLoader).map(l => l.registrationKey)]
     if (!loader.extractKey && !loader.matchKey) throw new Error('Tried to register a filtered dataloader without either extractKey or matchKey defined. One of the two is required.')
     if (loader.extractKey && loader.matchKey) throw new Error('Registered a filtered dataloader with both extractKey and matchKey defined. Only one of these may be provided.')
     DataLoaderFactory.filteredRegistry[key] = loader
   }
 
   static registerManyToMany<KeyType = any, ReturnType = any, FilterType = any, ContextType = any> (key: string, loader: ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>) {
-    if (loader.idLoader) loader.idLoaderKey = [...toArray(loader.idLoaderKey), ...toArray(loader.idLoader).map(l => l.registrationKey)]
+    loader.idLoaderKey = [...toArray(loader.idLoaderKey), ...toArray(loader.idLoader).map(l => l.registrationKey)]
     if (!loader.extractKeys && !loader.matchKey) throw new Error('Tried to register a many-to-many dataloader without either extractKeys or matchKey defined. One of the two is required.')
     DataLoaderFactory.filteredRegistry[key] = loader
   }
 
   static registerManyJoined<KeyType = any, ReturnType = any, FilterType = any, ContextType = any> (key: string, loader: ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>) {
-    if (loader.idLoader) loader.idLoaderKey = [...toArray(loader.idLoaderKey), ...toArray(loader.idLoader).map(l => l.registrationKey)];
+    loader.idLoaderKey = [...toArray(loader.idLoaderKey), ...toArray(loader.idLoader).map(l => l.registrationKey)];
     (loader as any).joined = true // to help generateloader tell the difference later
     DataLoaderFactory.filteredRegistry[key] = loader
   }
@@ -110,21 +118,27 @@ export class DataLoaderFactory<ContextType = undefined> {
   get<KeyType = any, ReturnType = any> (loader: PrimaryKeyLoader<KeyType, ReturnType, ContextType>): DataLoader<KeyType, ReturnType|undefined, string>
   get<KeyType = any, ReturnType = any> (key: string): DataLoader<KeyType, ReturnType|undefined, string>
   get<KeyType = any, ReturnType = any> (key: string|PrimaryKeyLoader<KeyType, ReturnType, ContextType>): DataLoader<KeyType, ReturnType|undefined, string> {
-    if (key instanceof PrimaryKeyLoader) key = key.registrationKey
-    const loaderConfig = DataLoaderFactory.registry[key]
-    if (!loaderConfig) throw new Error('Called DataLoaderFactory.get() with an unregistered key.')
-    if (!this.loaders[key]) this.loaders[key] = this.generateIdLoader(loaderConfig)
-    return this.loaders[key]
+    let ret = this.loaders.get(key)
+    if (!ret) {
+      const strKey = typeof key === 'string' ? key : key.registrationKey
+      ret = this.loaders.get(strKey)
+      if (ret) return ret
+      const loaderConfig = DataLoaderFactory.registry[strKey]
+      if (!loaderConfig) throw new Error('Called DataLoaderFactory.get() with an unregistered key.')
+      ret = this.generateIdLoader(loaderConfig)
+      this.loaders.set(key, ret)
+    }
+    return ret
   }
 
-  private generateIdLoader <KeyType, ReturnType>(loaderConfig: LoaderConfig<KeyType, ReturnType, ContextType>): DataLoader<KeyType, ReturnType, string> {
+  private generateIdLoader <KeyType, ReturnType>(loaderConfig: LoaderConfigInternal<KeyType, ReturnType, ContextType>): DataLoader<KeyType, ReturnType, string> {
     const options = loaderConfig.options ?? {}
     options.maxBatchSize = options.maxBatchSize ?? 1000
     return new DataLoader<KeyType, ReturnType, string>(async (ids: readonly any[]): Promise<any[]> => {
       const items = await loaderConfig.fetch(ids as any[], this.context)
       this.prime(loaderConfig, items)
       const keyed = items.reduce((keyed: any, item) => {
-        const key = stringify(loaderConfig.extractId ? loaderConfig.extractId(item) : defaultId(item))
+        const key = stringify(loaderConfig.extractId(item))
         keyed[key] = item
         return keyed
       }, {})
@@ -139,13 +153,18 @@ export class DataLoaderFactory<ContextType = undefined> {
   getOneToMany<KeyType = any, ReturnType = any, FilterType = any> (key: OneToManyLoader<KeyType, ReturnType, FilterType, ContextType>, filters?: FilterType): DataLoader<KeyType, ReturnType[], string>
   getOneToMany<KeyType = any, ReturnType = any, FilterType = any> (key: string, filters?: FilterType): DataLoader<KeyType, ReturnType[], string>
   getOneToMany<KeyType = any, ReturnType = any, FilterType = any> (key: string|OneToManyLoader<KeyType, ReturnType, FilterType, ContextType>, filters?: FilterType): DataLoader<KeyType, ReturnType[], string> {
-    if (typeof key !== 'string') key = key.registrationKey
-    const loaderConfig = DataLoaderFactory.filteredRegistry[key]
-    if (!loaderConfig) throw new Error('Tried to retrieve a dataloader from DataLoaderFactory with an unregistered key.')
-    if (!this.filteredLoaders[key]) this.filteredLoaders[key] = {}
-    const filtered = this.filteredLoaders[key]
+    let filtered = this.filteredLoaders.get(key)
+    if (!filtered) {
+      filtered = {}
+      this.filteredLoaders.set(key, filtered)
+    }
     const filterkey = stringify(filters)
-    if (!filtered[filterkey]) filtered[filterkey] = this.generateFilteredLoader(filters, loaderConfig)
+    if (!filtered[filterkey]) {
+      const strKey = typeof key === 'string' ? key : key.registrationKey
+      const loaderConfig = DataLoaderFactory.filteredRegistry[strKey]
+      if (!loaderConfig) throw new Error('Tried to retrieve a dataloader from DataLoaderFactory with an unregistered key.')
+      filtered[filterkey] = this.generateFilteredLoader(filters, loaderConfig)
+    }
     return filtered[filterkey].loader
   }
 
@@ -161,21 +180,19 @@ export class DataLoaderFactory<ContextType = undefined> {
     return this.getOneToMany(key as any, filters)
   }
 
-  getFilteredCache (key: string, filters?: any): Map<string, any>|undefined {
+  getFilteredCache (key: string|BaseManyLoader, filters?: any): Map<string, any>|undefined {
     const filterkey = stringify(filters)
-    return ((this.filteredLoaders[key] || {})[filterkey] || {}).cache
+    return ((this.filteredLoaders.get(key) ?? {})[filterkey] || {}).cache
   }
 
   private prime<KeyType, ReturnType> (loaderConfig: BaseManyLoaderConfig<KeyType, ReturnType>|LoaderConfig<KeyType, ReturnType, ContextType>, items: ReturnType[]) {
-    const loaderKeys = Array.isArray(loaderConfig.idLoaderKey)
-      ? loaderConfig.idLoaderKey
-      : loaderConfig.idLoaderKey ? [loaderConfig.idLoaderKey] : []
-    for (const loaderKey of loaderKeys) {
+    // register functions guarantee loaderConfig.idLoaderKey is an array
+    for (const loaderKey of loaderConfig.idLoaderKey!) {
       const idLoader = this.get(loaderKey)
       if (idLoader) {
         const idLoaderConfig = DataLoaderFactory.registry[loaderKey]
         for (const item of items) {
-          const id = idLoaderConfig.extractId ? idLoaderConfig.extractId(item) : defaultId(item)
+          const id = idLoaderConfig.extractId(item)
           if (id) idLoader.prime(id, item)
         }
       }
