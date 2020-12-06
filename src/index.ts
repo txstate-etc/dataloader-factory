@@ -17,8 +17,8 @@ export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextT
 }
 export class OneToManyLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> {
   registrationKey: string
-  constructor (config: OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>) {
-    this.registrationKey = Math.random().toString(32).substr(2)
+  constructor (config: OneToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>, registrationKey?: string) {
+    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
     DataLoaderFactory.registerOneToMany(this.registrationKey, config)
   }
 }
@@ -28,8 +28,8 @@ export interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, Context
 }
 export class ManyJoinedLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> {
   registrationKey: string
-  constructor (config: ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>) {
-    this.registrationKey = Math.random().toString(32).substr(2)
+  constructor (config: ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType, ContextType>, registrationKey?: string) {
+    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
     DataLoaderFactory.registerManyJoined(this.registrationKey, config)
   }
 }
@@ -40,8 +40,8 @@ interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType> e
 }
 export class ManyToManyLoader<KeyType = never, ReturnType = never, FilterType = undefined, ContextType = undefined> {
   registrationKey: string
-  constructor (config: ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>) {
-    this.registrationKey = Math.random().toString(32).substr(2)
+  constructor (config: ManyToManyLoaderConfig<KeyType, ReturnType, FilterType, ContextType>, registrationKey?: string) {
+    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
     DataLoaderFactory.registerManyToMany(this.registrationKey, config)
   }
 }
@@ -55,8 +55,8 @@ export interface LoaderConfig<KeyType, ReturnType, ContextType> {
 }
 export class PrimaryKeyLoader<KeyType = never, ReturnType = never, ContextType = undefined> {
   registrationKey: string
-  constructor (config: LoaderConfig<KeyType, ReturnType, ContextType>) {
-    this.registrationKey = Math.random().toString(32).substr(2)
+  constructor (config: LoaderConfig<KeyType, ReturnType, ContextType>, registrationKey?: string) {
+    this.registrationKey = registrationKey ?? Math.random().toString(32).substr(2)
     DataLoaderFactory.register(this.registrationKey, config)
   }
 }
