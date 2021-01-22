@@ -20,7 +20,7 @@ async function getData (type: 'books'): Promise<Book[]>
 async function getData (type: 'authors'): Promise<Author[]>
 async function getData (type: string) {
   const ymlstring = await fsp.readFile(`test/data/${type}.yml`, 'utf-8')
-  return yaml.safeLoad(ymlstring) as any[]
+  return yaml.load(ymlstring) as any[]
 }
 
 let byAuthorIdCount = 0
