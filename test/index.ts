@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import yaml from 'js-yaml'
 import { promises as fsp } from 'fs'
-import { DataLoaderFactory, ManyToManyLoader, PrimaryKeyLoader } from '../src/index'
+import { DataLoaderFactory, ManyJoinedLoader, ManyToManyLoader, OneToManyLoader, PrimaryKeyLoader } from '../src/index'
 import { expect } from 'chai'
 
 interface Author {
@@ -16,6 +16,10 @@ interface Book {
   genres: string[]
 }
 
+interface BookFilter {
+  genre: string
+}
+
 async function getData (type: 'books'): Promise<Book[]>
 async function getData (type: 'authors'): Promise<Author[]>
 async function getData (type: string) {
@@ -24,9 +28,8 @@ async function getData (type: string) {
 }
 
 let byAuthorIdCount = 0
-const BOOKS_BY_AUTHOR_ID = 'booksByAuthorId'
-DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID, {
-  fetch: async (keys, filters) => {
+const booksByAuthorId = new OneToManyLoader({
+  fetch: async (keys: number[], filters: BookFilter) => {
     byAuthorIdCount += 1
     const allbooks = await getData('books')
     return allbooks.filter(book => keys.includes(book.authorId) && book.genres.includes(filters.genre))
@@ -34,9 +37,8 @@ DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID, {
   extractKey: (item) => item.authorId
 })
 
-const BOOKS_BY_AUTHOR_ID_MATCHKEY = 'booksByAuthorIdMatchKey'
-DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID_MATCHKEY, {
-  fetch: async (keys, filters) => {
+const booksByAuthorIdMatchKey = new OneToManyLoader({
+  fetch: async (keys: number[], filters: BookFilter) => {
     const allbooks = await getData('books')
     return allbooks.filter(book => keys.includes(book.authorId) && book.genres.includes(filters.genre))
   },
@@ -44,83 +46,8 @@ DataLoaderFactory.registerOneToMany(BOOKS_BY_AUTHOR_ID_MATCHKEY, {
 })
 
 let byIdCount = 0
-const BOOKS_BY_ID = 'books'
 const booksCache = new Map()
-DataLoaderFactory.register<number, Book>(BOOKS_BY_ID, {
-  fetch: async ids => {
-    byIdCount += 1
-    const allbooks = await getData('books')
-    return allbooks.filter(book => ids.includes(book.id))
-  },
-  options: { cacheMap: booksCache }
-})
-
-const BOOKS_BY_ID_AND_TITLE = 'booksByIdAndTitle'
-DataLoaderFactory.register(BOOKS_BY_ID_AND_TITLE, {
-  fetch: async (compoundkeys) => {
-    const allbooks = await getData('books')
-    const ret = allbooks.filter(book =>
-      compoundkeys.some(compoundkey =>
-        Object.keys(compoundkey).every((field) => book[field as keyof Book] === compoundkey[field])
-      )
-    )
-    return ret
-  },
-  extractId: book => ({ id: book.id, name: book.name })
-})
-
-const BOOKS_BY_GENRE = 'booksByGenre'
-DataLoaderFactory.registerManyToMany(BOOKS_BY_GENRE, {
-  fetch: async genres => {
-    const allbooks = await getData('books')
-    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
-    return books
-  },
-  extractKeys: book => book.genres,
-  idLoaderKey: BOOKS_BY_ID
-})
-const BOOKS_BY_GENRE_MATCHKEY = 'booksByGenreMatchKey'
-DataLoaderFactory.registerManyToMany(BOOKS_BY_GENRE_MATCHKEY, {
-  fetch: async genres => {
-    const allbooks = await getData('books')
-    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
-    return books
-  },
-  matchKey: (key, book) => book.genres.includes(key)
-})
-
-const BOOKS_BY_GENRE_JOINED = 'booksByGenreJoined'
-DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED, {
-  fetch: async genres => {
-    const allbooks = await getData('books')
-    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
-    return books.flatMap(book => book.genres.map((g: any) => ({ key: g, value: book })))
-  },
-  idLoaderKey: [BOOKS_BY_ID]
-})
-
-const BOOKS_BY_GENRE_JOINED_MATCHKEY = 'booksByGenreJoinedMatchKey'
-DataLoaderFactory.registerManyJoined(BOOKS_BY_GENRE_JOINED_MATCHKEY, {
-  fetch: async genres => {
-    const allbooks = await getData('books')
-    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
-    return books.flatMap(book => book.genres.map((g: any) => ({ key: g, value: book })))
-  },
-  matchKey: (key, book) => book.genres.includes(key)
-})
-
-class DataLoaderTyped extends DataLoaderFactory {
-  get booksById () { return this.get<number, Book>(BOOKS_BY_ID) }
-  get booksByIdAndTitle () { return this.get<{ id: number, name: string }, Book>(BOOKS_BY_ID_AND_TITLE) }
-  get booksByAuthorId () { return this.typedOneToMany<number, Book>(BOOKS_BY_AUTHOR_ID) }
-  get booksByAuthorIdMatchKey () { return this.typedOneToMany<number, Book>(BOOKS_BY_AUTHOR_ID_MATCHKEY) }
-  get booksByGenre () { return this.typedManyToMany<string, Book>(BOOKS_BY_GENRE) }
-  get booksByGenreMatchKey () { return this.typedManyToMany<string, Book>(BOOKS_BY_GENRE_MATCHKEY) }
-  get booksByGenreJoined () { return this.typedManyToMany<string, Book>(BOOKS_BY_GENRE_JOINED) }
-  get booksByGenreJoinedMatchKey () { return this.typedManyToMany<string, Book>(BOOKS_BY_GENRE_JOINED_MATCHKEY) }
-}
-
-const bookLoader = new PrimaryKeyLoader({
+const booksById = new PrimaryKeyLoader({
   fetch: async (ids: number[]) => {
     byIdCount += 1
     const allbooks = await getData('books')
@@ -129,24 +56,55 @@ const bookLoader = new PrimaryKeyLoader({
   options: { cacheMap: booksCache }
 })
 
-const genreLoader = new ManyToManyLoader({
+const booksByIdAndTitle = new PrimaryKeyLoader({
+  fetch: async (compoundkeys: { id: number, name: string }[]) => {
+    const allbooks = await getData('books')
+    const ret = allbooks.filter(book =>
+      compoundkeys.some(compoundkey =>
+        book.id === compoundkey.id && book.name === compoundkey.name
+      )
+    )
+    return ret
+  },
+  extractId: book => ({ id: book.id, name: book.name })
+})
+
+const booksByGenre = new ManyToManyLoader({
   fetch: async (genres: string[]) => {
     const allbooks = await getData('books')
-    const books = allbooks.filter(book => book.genres.some(genre => genres.includes(genre)))
+    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
     return books
   },
   extractKeys: book => book.genres,
-  idLoader: bookLoader
+  idLoader: booksById
+})
+
+const booksByGenreMatchKey = new ManyToManyLoader({
+  fetch: async (genres: string[]) => {
+    const allbooks = await getData('books')
+    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
+    return books
+  },
+  matchKey: (key, book) => book.genres.includes(key)
+})
+
+const booksByGenreJoined = new ManyJoinedLoader({
+  fetch: async (genres: string[]) => {
+    const allbooks = await getData('books')
+    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
+    return books.flatMap(book => book.genres.map((g: any) => ({ key: g, value: book })))
+  },
+  idLoader: [booksById]
 })
 
 describe('bookloader', () => {
-  const dataLoaderFactory = new DataLoaderTyped()
+  const factory = new DataLoaderFactory()
   before(() => {
     byAuthorIdCount = 0
     byIdCount = 0
   })
   it('should be able to load books by authorId', async () => {
-    const loader = dataLoaderFactory.booksByAuthorId({ genre: 'mystery' })
+    const loader = factory.get(booksByAuthorId, { genre: 'mystery' })
     const authors = await getData('authors')
     const authorBooks = await Promise.all<any>(authors.map(async (a: any) => await loader.load(a.id)))
     expect(byAuthorIdCount).to.equal(1)
@@ -158,47 +116,46 @@ describe('bookloader', () => {
     }
   })
   it('should return an empty array for an unrecognized authorId', async () => {
-    const loader = dataLoaderFactory.booksByAuthorId()
-    const authorBooks = await loader.load(999)
+    const authorBooks = await factory.get(booksByAuthorId).load(999)
     expect(byAuthorIdCount).to.equal(2)
     expect(authorBooks).to.have.length(0)
   })
   it('should use dataloader cache for subsequent loads', async () => {
-    const books = await dataLoaderFactory.booksByAuthorId({ genre: 'mystery' }).load(2)
+    const books = await factory.get(booksByAuthorId, { genre: 'mystery' }).load(2)
     expect(books).to.have.length(1)
     expect(byAuthorIdCount).to.equal(2)
   })
   it('should have cached authorId fetches', async () => {
-    const cache = dataLoaderFactory.getFilteredCache(BOOKS_BY_AUTHOR_ID, { genre: 'mystery' })
+    const cache = factory.getFilteredCache(booksByAuthorId, { genre: 'mystery' })
     expect(cache).to.have.length(6)
   })
   it('should load books with the ID dataloader', async () => {
-    const book = await dataLoaderFactory.booksById.load(2)
+    const book = await factory.get(booksById).load(2)
     expect(book).to.exist
     expect(byIdCount).to.equal(1)
     expect(book!.id).to.equal(2)
   })
   it('should load multiple books with the ID dataloader and keep them in order', async () => {
-    const twobooks = await Promise.all([4, 3].map(async id => await dataLoaderFactory.get(BOOKS_BY_ID).load(id)))
+    const twobooks = await Promise.all([4, 3].map(async id => await factory.get(booksById).load(id)))
     expect(byIdCount).to.equal(2)
     expect(twobooks).to.have.length(2)
     expect(twobooks[0]!.id).to.equal(4)
     expect(twobooks[1]!.id).to.equal(3)
   })
   it('should cache subsequent loads by ID', async () => {
-    const book = await dataLoaderFactory.booksById.load(3)
+    const book = await factory.get(booksById).load(3)
     expect(byIdCount).to.equal(2)
     expect(book!.id).to.equal(3)
   })
 
   it('should support compound keys', async () => {
-    const book = await dataLoaderFactory.booksByIdAndTitle.load({ id: 2, name: 'Bloody Bones' })
+    const book = await factory.get(booksByIdAndTitle).load({ id: 2, name: 'Bloody Bones' })
     expect(book!.id).to.equal(2)
   })
 
   it('should support many to many, i.e. extractKey returns an array', async () => {
     booksCache.clear()
-    const books = await dataLoaderFactory.booksByGenre().load('mystery')
+    const books = await factory.get(booksByGenre).load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))
@@ -208,7 +165,7 @@ describe('bookloader', () => {
 
   it('should work with the manyJoined pattern', async () => {
     booksCache.clear()
-    const books = await dataLoaderFactory.booksByGenreJoined().load('mystery')
+    const books = await factory.get(booksByGenreJoined).load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))
@@ -216,35 +173,14 @@ describe('bookloader', () => {
     expect(booksCache).to.have.lengthOf(2)
   })
   it('should support matchKey in one-to-many pattern', async () => {
-    const books = await dataLoaderFactory.booksByAuthorIdMatchKey({ genre: 'mystery' }).load(2)
+    const books = await factory.get(booksByAuthorIdMatchKey, { genre: 'mystery' }).load(2)
     expect(books).to.have.length(1)
     for (const book of books) {
       expect(book.genres.includes('mystery'))
     }
   })
   it('should support matchKey in many-to-many pattern', async () => {
-    const books = await dataLoaderFactory.booksByGenreMatchKey().load('mystery')
-    expect(books).to.have.length(2)
-    for (const book of books) {
-      expect(book.genres.includes('mystery'))
-    }
-  })
-  it('should support matchKey in many-to-many-joined pattern', async () => {
-    const books = await dataLoaderFactory.booksByGenreJoinedMatchKey().load('mystery')
-    expect(books).to.have.length(2)
-    for (const book of books) {
-      expect(book.genres.includes('mystery'))
-    }
-  })
-  it('should support the new typesafe way of doing things', async () => {
-    const book = await dataLoaderFactory.get(bookLoader).load(2)
-    expect(book).to.exist
-    expect(book!.id).to.equal(2)
-  })
-  it('should support the new typesafe way for many to many', async () => {
-    booksCache.clear()
-    const books = await dataLoaderFactory.getMany(genreLoader).load('mystery')
-    expect(booksCache).to.have.lengthOf(2)
+    const books = await factory.get(booksByGenreMatchKey).load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))

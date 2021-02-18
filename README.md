@@ -9,6 +9,37 @@ In addition, it takes on the burden of putting results into the correct order fo
 having you specify an `extractId` or `extractKey` function to teach it where the id is in your data
 object.
 
+## Upgrading from 3.0
+
+The 4.0 release is a major API revision that focuses on the typescript-safe API outlined in this README. The old string-based `.register` and `.get` and `.getOneToMany` and etc are all gone. You'll need to update your code to change over to the new API, but the configuration options have not changed (except `matchKey` has been removed from the `ManyJoinedLoader` since it doesn't make sense).
+
+```javascript
+DataLoaderFactory.register('youruniquestring', { /* your config */ })
+// inside your resolvers
+  factory.get('youruniquestring').load(id)
+```
+should be replaced with
+```javascript
+const myLoader = new PrimaryKeyLoader({ /* your config */ })
+// inside your resolvers
+  factory.get(myLoader).load(id)
+```
+The transition is very similar for the many-to-many types, except all the `.getOneToMany`, `.getManyToMany`, etc, have been replaced with a simple `.get` for simplicity.
+
+### If you were using typesafe classes already
+Note that `factory.getMany`, from the 3.0 typesafe class API has been replaced in all cases by `factory.get`.
+```javascript
+const myOneToManyLoader = new OneToManyLoader({ /* your config */ })
+// inside your resolvers
+  factory.getMany(myOneToManyLoader, args).load(id)
+```
+should be replaced with
+```javascript
+const myOneToManyLoader = new OneToManyLoader({ /* your config */ })
+// inside your resolvers
+  factory.get(myOneToManyLoader, args).load(id)
+```
+
 ## Basic Usage (Load by Primary Key)
 Each potential dataloader in your system must be created at startup. The `*Loader` classes are tightly coupled with `DataLoaderFactory` and register themselves with it upon construction. You can spread your `*Loader` configurations out into any file structure you like, just export the instance so you can import it for your resolvers.
 
@@ -77,24 +108,24 @@ new ApolloServer({
 The `PrimaryKeyLoader` is only appropriate for primary key lookups (or another key that
 identifies exactly one record). To fetch relations that return an array, a more complex pattern is required.
 
-The first of these patterns is the one-to-many pattern. Use it when your fetch function will return
-objects that can be mapped back to a single key value. For instance, a page always exists inside a
+The first of these patterns is the one-to-many pattern. Use it when your fetch function returns
+objects that will each map to a single key value. For instance, a page always exists inside a
 single book, so the `pagesByBookId` implementation might look like this:
-
 ```javascript
 import { OneToManyLoader } from 'dataloader-factory'
 const pagesByBookIdLoader = new OneToManyLoader({
   fetch: async bookids => {
-    return db.query(`SELECT * FROM pages WHERE bookId IN (${bookids.map(id => '?').join(',')})` bookids)
+    return db.query(
+      `SELECT * FROM pages WHERE bookId IN (${bookids.map(id => '?').join(',')})`,
+    bookids)
   },
   extractKey: page => page.bookId
 })
 ```
-The resolver might then look like this. Note the use of `.getMany()` instead of `.get`. This is for
-performance and readability.
+The resolver might then look like this.
 ```javascript
 export const bookPagesResolver = (book, args, context) => {
-  return context.dataLoaderFactory.getMany(pagesByBookIdLoader, args).load(book.id)
+  return context.dataLoaderFactory.get(pagesByBookIdLoader, args).load(book.id)
 }
 ```
 Note that this is also useful for many-to-many relationships that have a named intermediary. For
@@ -123,7 +154,7 @@ const myOneToManyLoader = new OneToManyLoader<KeyType, ObjectType, FilterType>({
   // advanced usage only, covered later in this readme
   matchKey: (key: KeyType, item: ObjectType) => boolean
 
-  // generated dataloaders will not keep a cache
+  // generated dataloaders will not keep a cache, batch only
   skipCache: false
 
   // maxBatchSize to be passed to each DataLoader
@@ -163,7 +194,8 @@ However, `Genre.books` requires a special treatment from DataLoaderFactory that 
 import { ManyToManyLoader } from 'dataloader-factory'
 const booksByGenreIdLoader = new ManyToManyLoader({
   fetch: async genreIds => {
-    return db.collection('books').find({ genreIds: { $in: genreIds } }).toArray() // mongodb client syntax
+    // this example is for mongodb client
+    return db.collection('books').find({ genreIds: { $in: genreIds } }).toArray()
   },
   extractKeys: book => book.genreIds
 })
@@ -171,7 +203,7 @@ const booksByGenreIdLoader = new ManyToManyLoader({
 and the resolver
 ```javascript
 export const genreBooksResolver = (genre, args, context) => {
-  return context.dataLoaderFactory.getMany(booksByGenreIdLoader).load(genre.id)
+  return context.dataLoaderFactory.get(booksByGenreIdLoader).load(genre.id)
 }
 ```
 Note that it is also possible to use a named intermediary in document-oriented databases. Depending on
@@ -184,31 +216,29 @@ import { OneToManyLoader } from 'dataloader-factory'
 const booksByGenreIdLoader = new OneToManyLoader({
   fetch: async genreIds => {
     const books = await db.get(`
-      SELECT b.*, g.id as genreId
+      SELECT b.*, bg.genre_id as genreId
       FROM books b
       INNER JOIN books_genres bg ON b.id = bg.book_id
-      INNER JOIN genres g ON g.id = bg.genre_id
-      WHERE g.id IN (${genreIds.map(id => '?').join(',')})`)
+      WHERE bg.genre_id IN (${genreIds.map(id => '?').join(',')})`)
     return books
   },
   extractKey: book => book.genreId
 })
 ```
-This will work but it means the `Book` object being passed to the rest of your code has a `genreId`
+This will work but it means the book object being passed to the rest of your code has a `genreId`
 property that doesn't really belong there. This is especially annoying when using Typescript as you need
 to create a new interface like `BookWithGenreId` to represent this not-quite-a-book object.
 
-Luckily DataLoaderFactory provides a cleaner pattern with `ManyJoined` and `getManyJoined`:
+Luckily DataLoaderFactory provides a cleaner pattern with `ManyJoinedLoader`:
 ```javascript
 import { ManyJoinedLoader } from 'dataloader-factory'
 const booksByGenreIdLoader = new ManyJoinedLoader({
   fetch: async genreIds => {
     const books = await db.get(`
-      SELECT b.*, g.id as genreId
+      SELECT b.*, bg.genre_id as genreId
       FROM books b
       INNER JOIN books_genres bg ON b.id = bg.book_id
-      INNER JOIN genres g ON g.id = bg.genre_id
-      WHERE g.id IN (${genreIds.map(id => '?').join(',')})`)
+      WHERE bg.genre_id IN (${genreIds.map(id => '?').join(',')})`)
     return books.map(row => ({ key: row.genreId, value: new Book(row) }))
   }
 })
@@ -253,7 +283,7 @@ const booksByAuthorIdLoader = new OneToManyLoader({
   extractKey: book => book.authorId
 })
 export const authorBooksResolver = (author, args, context) => {
-  return context.dataLoaderFactory.getMany(booksByAuthorIdLoader, args).load(author.id)
+  return context.dataLoaderFactory.get(booksByAuthorIdLoader, args).load(author.id)
 }
 ```
 Behind the scenes, what this does is generate a distinct dataloader instance for each set of args used on that resolver. Since a graphql query is always finite, and each request gets a new factory, the number of possible dataloaders generated is finite and manageable as well.
@@ -353,6 +383,6 @@ const booksByAuthorIdLoader = new OneToManyLoader({
 export const authorBooksResolver = (author, args, context) => {
   // this next line is type-safe: args and author.id will both be checked and load will return
   // Promise<YourBookType>
-  return context.dataLoaderFactory.getMany(authorBooksLoader, args).load(author.id)
+  return context.dataLoaderFactory.get(authorBooksLoader, args).load(author.id)
 }
 ```

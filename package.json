@@ -1,6 +1,6 @@
 {
   "name": "dataloader-factory",
-  "version": "3.3.3",
+  "version": "4.0.0",
   "description": "DataLoader classes to make it easier to write complex graphql resolvers.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -42,8 +42,7 @@
   },
   "dependencies": {
     "dataloader": "^2.0.0",
-    "fast-json-stable-stringify": "^2.1.0",
-    "txstate-utils": "^1.2.23"
+    "fast-json-stable-stringify": "^2.1.0"
   },
   "files": [
     "dist/**/*"
