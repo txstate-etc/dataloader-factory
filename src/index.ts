@@ -63,12 +63,16 @@ export interface BaseManyLoaderConfig<KeyType, ReturnType> {
   idLoader?: PrimaryKeyLoader<any, ReturnType>|PrimaryKeyLoader<any, ReturnType>[]
 }
 export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Loader<KeyType, ReturnType, FilterType> {
+  constructor (public config: BaseManyLoaderConfig<KeyType, ReturnType>) {
+    super(config)
+    this.config.cacheKeyFn ??= stringify
+    this.config.maxBatchSize ??= 1000;
+    (this.config as any).useCache = !this.config.skipCache
+  }
+
   protected factory!: DataLoaderFactory
   init (factory: DataLoaderFactory) {
     this.factory = factory
-    this.config.cacheKeyFn ??= stringify
-    this.config.maxBatchSize ??= 1000
-    this.config.useCache = !this.config.skipCache
     return new Map()
   }
 
@@ -88,12 +92,12 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
       storageObject = {
         cache,
         loader: new DataLoader<KeyType, ReturnType[], string>(async (keys: readonly KeyType[]): Promise<(Error | ReturnType[])[]> => {
-          const stringkeys: string[] = keys.map(this.config.cacheKeyFn)
+          const stringkeys: string[] = keys.map(this.config.cacheKeyFn!)
           const dedupekeys: Map<string, KeyType> = new Map()
           for (let i = 0; i < keys.length; i++) {
             dedupekeys.set(stringkeys[i], keys[i])
           }
-          const items = await this.config.fetch(Array.from(dedupekeys.values()), filters, this.factory.context)
+          const items = await (this.config as any).fetch(Array.from(dedupekeys.values()), filters, this.factory.context)
           for (const loader of this.idLoaders) {
             this.prime(loader, items)
           }
@@ -102,7 +106,7 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
           return stringkeys.map(key => grouped[key] || [])
         }, {
           cacheKeyFn: this.config.cacheKeyFn,
-          cache: this.config.useCache,
+          cache: (this.config as any).useCache,
           cacheMap: cache,
           maxBatchSize: this.config.maxBatchSize
         })
@@ -130,7 +134,7 @@ export class OneToManyLoader<KeyType = never, ReturnType = never, FilterType = u
         const ret = {}
         for (const item of items) {
           for (const key of dedupekeys.values()) {
-            if (config.matchKey!(key, item)) pushRecord(ret, this.config.cacheKeyFn(key), item)
+            if (config.matchKey!(key, item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
           }
         }
         return ret
@@ -139,7 +143,7 @@ export class OneToManyLoader<KeyType = never, ReturnType = never, FilterType = u
       this.groupItems = (items: ReturnType[]) => {
         const ret = {}
         for (const item of items) {
-          pushRecord(ret, this.config.cacheKeyFn(config.extractKey!(item)), item)
+          pushRecord(ret, this.config.cacheKeyFn!(config.extractKey!(item)), item)
         }
         return ret
       }
@@ -162,7 +166,7 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
   groupItems (items: ManyJoinedType<KeyType, ReturnType>[]) {
     const ret: Record<string, ReturnType[]> = {}
     for (const { key, value } of items) {
-      pushRecord(ret, this.config.cacheKeyFn(key), value)
+      pushRecord(ret, this.config.cacheKeyFn!(key), value)
     }
     return ret
   }
@@ -187,7 +191,7 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
         const ret = {}
         for (const item of items) {
           for (const key of dedupekeys.values()) {
-            if (config.matchKey!(key, item)) pushRecord(ret, this.config.cacheKeyFn(key), item)
+            if (config.matchKey!(key, item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
           }
         }
         return ret
@@ -196,7 +200,7 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
       this.groupItems = (items: ReturnType[]) => {
         const ret = {}
         for (const item of items) {
-          for (const key of config.extractKeys!(item)) pushRecord(ret, this.config.cacheKeyFn(key), item)
+          for (const key of config.extractKeys!(item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
         }
         return ret
       }
