@@ -246,7 +246,7 @@ export class DataLoaderFactory<ContextType = undefined> {
     return loader.getDataLoader(loaderCache, filters)
   }
 
-  getFilteredCache<KeyType, ReturnType, FilterType>(loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>> {
+  getCache<KeyType, ReturnType, FilterType>(loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>> {
     const cached = this.loaders.get(loader)
     if (cached instanceof DataLoader) throw new Error('Cannot get cache for a primary key loader. Pass it a Map of your own in options.cacheMap instead.')
     if (!cached) return new Map()

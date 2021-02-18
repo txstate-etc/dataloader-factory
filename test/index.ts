@@ -126,7 +126,7 @@ describe('bookloader', () => {
     expect(byAuthorIdCount).to.equal(2)
   })
   it('should have cached authorId fetches', async () => {
-    const cache = factory.getFilteredCache(booksByAuthorId, { genre: 'mystery' })
+    const cache = factory.getCache(booksByAuthorId, { genre: 'mystery' })
     expect(cache).to.have.length(6)
   })
   it('should load books with the ID dataloader', async () => {
