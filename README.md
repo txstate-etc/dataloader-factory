@@ -41,7 +41,7 @@ const myOneToManyLoader = new OneToManyLoader({ /* your config */ })
 ```
 
 ## Basic Usage (Load by Primary Key)
-Each potential dataloader in your system must be created at startup. The `*Loader` classes are tightly coupled with `DataLoaderFactory` and register themselves with it upon construction. You can spread your `*Loader` configurations out into any file structure you like, just export the instance so you can import it for your resolvers.
+Each potential dataloader in your system must be created at startup. The `*Loader` classes are tightly coupled with `DataLoaderFactory`. You can spread your `*Loader` configurations out into any file structure you like, just export the instance so you can import it for your resolvers.
 
 ```javascript
 import { PrimaryKeyLoader } from 'dataloader-factory'

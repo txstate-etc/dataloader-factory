@@ -178,7 +178,7 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
   }
 }
 
-interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ReturnType[]>
   extractKeys?: (item: ReturnType) => KeyType[]
   matchKey?: (key: KeyType, item: ReturnType) => boolean
