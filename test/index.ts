@@ -69,6 +69,24 @@ const booksByIdAndTitle = new PrimaryKeyLoader({
   extractId: book => ({ id: book.id, name: book.name })
 })
 
+let customStringifyCount = 0
+const booksByIdAndTitleCustomStringify = new PrimaryKeyLoader({
+  fetch: async (compoundkeys: { id: number, name: string }[]) => {
+    customStringifyCount += 1
+    const allbooks = await getData('books')
+    const ret = allbooks.filter(book =>
+      compoundkeys.some(compoundkey =>
+        book.id === compoundkey.id && book.name === compoundkey.name
+      )
+    )
+    return ret
+  },
+  extractId: book => ({ id: book.id, name: book.name }),
+  options: {
+    cacheKeyFn: ({ id, name }: { id: number, name: string }) => `${id}.${name}`
+  }
+})
+
 const booksByGenre = new ManyToManyLoader({
   fetch: async (genres: string[]) => {
     const allbooks = await getData('books')
@@ -151,9 +169,23 @@ describe('bookloader', () => {
   it('should support compound keys', async () => {
     const book = await factory.get(booksByIdAndTitle).load({ id: 2, name: 'Bloody Bones' })
     expect(book!.id).to.equal(2)
+    const nobook = await factory.get(booksByIdAndTitle).load({ id: 2, name: 'Tale of Two Cities' })
+    expect(nobook).to.be.undefined
   })
 
-  it('should support many to many, i.e. extractKey returns an array', async () => {
+  it('should support compound keys with custom cache key function', async () => {
+    const book = await factory.get(booksByIdAndTitleCustomStringify).load({ id: 2, name: 'Bloody Bones' })
+    expect(book!.id).to.equal(2)
+    expect(customStringifyCount).to.equal(1)
+    const samebook = await factory.get(booksByIdAndTitleCustomStringify).load({ id: 2, name: 'Bloody Bones' })
+    expect(samebook!.id).to.equal(2)
+    expect(customStringifyCount).to.equal(1)
+    const anotherbook = await factory.get(booksByIdAndTitleCustomStringify).load({ id: 3, name: 'Tale of Two Cities' })
+    expect(anotherbook!.id).to.equal(3)
+    expect(customStringifyCount).to.equal(2)
+  })
+
+  it('should support many to many and prime the booksById cache', async () => {
     booksCache.clear()
     const books = await factory.get(booksByGenre).load('mystery')
     expect(books).to.have.length(2)
@@ -163,7 +195,7 @@ describe('bookloader', () => {
     expect(booksCache).to.have.lengthOf(2)
   })
 
-  it('should work with the manyJoined pattern', async () => {
+  it('should work with the manyJoined pattern and prime the booksById cache', async () => {
     booksCache.clear()
     const books = await factory.get(booksByGenreJoined).load('mystery')
     expect(books).to.have.length(2)
