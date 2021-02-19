@@ -226,7 +226,7 @@ function pushRecord (record: { [keys: string]: any[] }, key: string, item: any) 
   record[key].push(item)
 }
 
-export class DataLoaderFactory<ContextType = undefined> {
+export class DataLoaderFactory<ContextType = any> {
   private loaders: Map<Loader<any, any, any>, DataLoader<any, any, string>|Map<string, FilteredStorageObject<any, any>>>
   public context: ContextType
 
