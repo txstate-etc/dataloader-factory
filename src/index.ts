@@ -246,6 +246,17 @@ export class DataLoaderFactory<ContextType = any> {
     return loader.getDataLoader(loaderCache, filters)
   }
 
+  async loadMany<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
+  async loadMany<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, keys: KeyType[], filters?: FilterType): Promise<ReturnType[]>
+  async loadMany<KeyType, ReturnType, FilterType> (loader: Loader<KeyType, ReturnType, FilterType>, keys: KeyType[], filter?: FilterType) {
+    if (loader instanceof PrimaryKeyLoader) {
+      return (await Promise.all(keys.map(async k => await this.get(loader).load(k)))).filter(r => typeof r !== 'undefined')
+    } else if (loader instanceof BaseManyLoader) {
+      return (await Promise.all(keys.map(async k => await this.get(loader, filter).load(k)))).flat()
+    }
+    return []
+  }
+
   getCache<KeyType, ReturnType, FilterType>(loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>> {
     const cached = this.loaders.get(loader)
     if (cached instanceof DataLoader) throw new Error('Cannot get cache for a primary key loader. Pass it a Map of your own in options.cacheMap instead.')

@@ -352,6 +352,23 @@ const booksAfterYearLoader = new OneToManyLoader({
 })
 ```
 
+## loadMany
+Dataloader has a `.loadMany` method that can be used to retrieve objects based on an
+array of keys. However, it is designed to return Errors for any keys that threw an error, so
+you have to be aware of that any time you use it. Additionally, keys that do not point at any
+data will come back undefined, and you will have undefined values in the returned array.
+
+To avoid both of these problems and just get an array of any of the objects that exist, a
+`.loadMany` method exists on the factory for your convenience:
+```javascript
+const books = await ctx.loaders.loadMany(bookLoader, bookIds)
+```
+It also works for *ToMany loaders and flattens the results (this would return an array
+of books written by any of the specified authors):
+```javascript
+const books = await ctx.loaders.loadMany(booksByAuthorLoader, authorIds, filters)
+```
+
 ## TypeScript
 This library is written in typescript and provides its own types. When you create a new loader type,
 you can choose whether to provide your types as generics, which will help you write your `fetch` function properly, or you can write your `fetch` function and its input/return types will be used implicitly for everything else.

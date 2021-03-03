@@ -218,4 +218,13 @@ describe('bookloader', () => {
       expect(book.genres.includes('mystery'))
     }
   })
+  it('should be able to load many ids at once, ignoring undefineds', async () => {
+    const books = await factory.loadMany(booksById, [1, 5, 6, 20])
+    expect(books.length).to.equal(3)
+  })
+  it('should be able to load many from a *ToMany loader and flatten the results', async () => {
+    const books = await factory.loadMany(booksByGenre, ['fantasy', 'holiday', 'nulltest'])
+    expect(books.length).to.equal(4)
+    for (const book of books) expect(book.genres.filter(g => ['fantasy', 'holiday'].includes(g))).to.not.be.empty
+  })
 })
