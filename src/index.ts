@@ -126,7 +126,7 @@ export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType> extends 
   extractKey?: (item: ReturnType) => KeyType
   matchKey?: (key: KeyType, item: ReturnType) => boolean
 }
-export class OneToManyLoader<KeyType = never, ReturnType = never, FilterType = undefined> extends BaseManyLoader<KeyType, ReturnType, FilterType> {
+export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extends BaseManyLoader<KeyType, ReturnType, FilterType> {
   constructor (config: OneToManyLoaderConfig<KeyType, ReturnType, FilterType>) {
     super(config)
     if (config.matchKey) {
