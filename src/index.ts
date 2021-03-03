@@ -250,9 +250,11 @@ export class DataLoaderFactory<ContextType = any> {
   async loadMany<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, keys: KeyType[], filters?: FilterType): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: Loader<KeyType, ReturnType, FilterType>, keys: KeyType[], filter?: FilterType) {
     if (loader instanceof PrimaryKeyLoader) {
-      return (await Promise.all(keys.map(async k => await this.get(loader).load(k)))).filter(r => typeof r !== 'undefined')
+      const dl = this.get(loader)
+      return (await Promise.all(keys.map(async k => await dl.load(k)))).filter(r => typeof r !== 'undefined')
     } else if (loader instanceof BaseManyLoader) {
-      return (await Promise.all(keys.map(async k => await this.get(loader, filter).load(k)))).flat()
+      const dl = this.get(loader, filter)
+      return (await Promise.all(keys.map(async k => await dl.load(k)))).flat()
     }
     return []
   }
