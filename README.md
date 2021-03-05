@@ -210,7 +210,7 @@ Note that it is also possible to use a named intermediary in document-oriented d
 the database, you may still find the Many-to-Many-Joined pattern useful in those cases.
 
 ## Many-to-Many-Joined DataLoaders
-It is possible to handle many to many relationships with the oneToMany pattern, like this:
+It is technically possible to handle SQL many to many relationships with the OneToManyLoader, like this:
 ```javascript
 import { OneToManyLoader } from 'dataloader-factory'
 const booksByGenreIdLoader = new OneToManyLoader({

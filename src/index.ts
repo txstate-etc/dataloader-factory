@@ -11,6 +11,9 @@ export abstract class Loader<KeyType, ReturnType, FilterType> {
 
   abstract init (factory: DataLoaderFactory): any
   abstract getDataLoader (cached: any, filters?: FilterType): DataLoader<KeyType, ReturnType|undefined, string>|DataLoader<KeyType, ReturnType[], string>
+  addIdLoader (loader: PrimaryKeyLoader<any, ReturnType>) {
+    this.idLoaders.push(loader)
+  }
 }
 
 export interface LoaderConfig<KeyType, ReturnType> {
