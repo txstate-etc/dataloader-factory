@@ -26,13 +26,16 @@ export class PrimaryKeyLoader<KeyType, ReturnType> extends Loader<KeyType, Retur
   constructor (public config: LoaderConfig<KeyType, ReturnType>) {
     super(config)
     this.extractId = config.extractId ?? defaultId
-    config.options ??= {}
-    config.options.maxBatchSize ??= 1000
-    config.options.cacheKeyFn ??= stringify
+    this.config.options = {
+      ...this.config.options,
+      maxBatchSize: config.options?.maxBatchSize ?? 1000,
+      cacheKeyFn: config.options?.cacheKeyFn ?? stringify
+    }
   }
 
   init (factory: DataLoaderFactory) {
-    return new DataLoader<KeyType, ReturnType, string>(async (ids: readonly KeyType[]): Promise<any[]> => {
+    const cacheMap = this.config.options!.cacheMap ?? new Map()
+    const dl = new DataLoader<KeyType, ReturnType, string>(async (ids: readonly KeyType[]): Promise<any[]> => {
       const items = await this.config.fetch(ids as KeyType[], factory.context)
       for (const idLoader of this.idLoaders) {
         for (const item of items) {
@@ -45,7 +48,9 @@ export class PrimaryKeyLoader<KeyType, ReturnType> extends Loader<KeyType, Retur
         return keyed
       }, new Map())
       return ids.map(this.config.options!.cacheKeyFn!).map(id => keyed.get(id))
-    }, this.config.options)
+    }, { ...this.config.options, cacheMap });
+    (dl as any).cacheMap = cacheMap
+    return dl
   }
 
   getDataLoader (cached: DataLoader<KeyType, ReturnType|undefined, string>) {
@@ -262,12 +267,16 @@ export class DataLoaderFactory<ContextType = any> {
     return []
   }
 
-  getCache<KeyType, ReturnType, FilterType>(loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>> {
+  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType>|BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>>|undefined {
     const cached = this.loaders.get(loader)
-    if (cached instanceof DataLoader) throw new Error('Cannot get cache for a primary key loader. Pass it a Map of your own in options.cacheMap instead.')
-    if (!cached) return new Map()
-    const cache = loader.getCache(cached, filters)
+    if (!cached) return undefined
+    if (loader instanceof PrimaryKeyLoader) return (cached as any).cacheMap
+    const cache = loader.getCache(cached as Map<string, FilteredStorageObject<any, any>>, filters)
     if (!cache) throw new Error('Cannot get cache for a loader that has the skipCache option enabled.')
     return cache
+  }
+
+  clear () {
+    this.loaders = new Map()
   }
 }

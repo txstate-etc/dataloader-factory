@@ -369,6 +369,14 @@ of books written by any of the specified authors):
 const books = await ctx.loaders.loadMany(booksByAuthorLoader, authorIds, filters)
 ```
 
+## Mutations
+In graphql, after a mutation there will be a query, which can be very complex. If this query
+is evaluated after you have already done some dataloading (e.g. to find related objects to help
+authorize the mutation), you will want to get rid of any cache that was fetched before the mutation
+completed. Creating a new DataLoaderFactory instance is one way, but probably cumbersome. Instead
+of replacing your instance, you can call `.clear()` on your instance and all your existing
+dataloaders will be tossed so that your post-mutation query can run against fresh data.
+
 ## TypeScript
 This library is written in typescript and provides its own types. When you create a new loader type,
 you can choose whether to provide your types as generics, which will help you write your `fetch` function properly, or you can write your `fetch` function and its input/return types will be used implicitly for everything else.

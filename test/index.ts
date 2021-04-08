@@ -46,14 +46,12 @@ const booksByAuthorIdMatchKey = new OneToManyLoader({
 })
 
 let byIdCount = 0
-const booksCache = new Map()
 const booksById = new PrimaryKeyLoader({
   fetch: async (ids: number[]) => {
     byIdCount += 1
     const allbooks = await getData('books')
     return allbooks.filter(book => ids.includes(book.id))
-  },
-  options: { cacheMap: booksCache }
+  }
 })
 
 const booksByIdAndTitle = new PrimaryKeyLoader({
@@ -186,23 +184,23 @@ describe('bookloader', () => {
   })
 
   it('should support many to many and prime the booksById cache', async () => {
-    booksCache.clear()
+    factory.get(booksById).clearAll()
     const books = await factory.get(booksByGenre).load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))
     }
-    expect(booksCache).to.have.lengthOf(2)
+    expect(factory.getCache(booksById)).to.have.lengthOf(2)
   })
 
   it('should work with the manyJoined pattern and prime the booksById cache', async () => {
-    booksCache.clear()
+    factory.get(booksById).clearAll()
     const books = await factory.get(booksByGenreJoined).load('mystery')
     expect(books).to.have.length(2)
     for (const book of books) {
       expect(book.genres.includes('mystery'))
     }
-    expect(booksCache).to.have.lengthOf(2)
+    expect(factory.getCache(booksById)).to.have.lengthOf(2)
   })
   it('should support matchKey in one-to-many pattern', async () => {
     const books = await factory.get(booksByAuthorIdMatchKey, { genre: 'mystery' }).load(2)
@@ -226,5 +224,16 @@ describe('bookloader', () => {
     const books = await factory.loadMany(booksByGenre, ['fantasy', 'holiday', 'nulltest'])
     expect(books.length).to.equal(4)
     for (const book of books) expect(book.genres.filter(g => ['fantasy', 'holiday'].includes(g))).to.not.be.empty
+  })
+  it('should be able to clear the loader cache and recover', async () => {
+    factory.get(booksById).clearAll()
+    byIdCount = 0
+    const book = await factory.get(booksById).load(3)
+    expect(byIdCount).to.equal(1)
+    expect(book!.id).to.equal(3)
+    factory.clear()
+    const book2 = await factory.get(booksById).load(3)
+    expect(byIdCount).to.equal(2)
+    expect(book2!.id).to.equal(3)
   })
 })
