@@ -1,6 +1,6 @@
 {
   "name": "dataloader-factory",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "DataLoader classes to make it easier to write complex graphql resolvers.",
   "exports": {
     "require": "./dist/index.js",

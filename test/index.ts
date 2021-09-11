@@ -37,6 +37,14 @@ const booksByAuthorId = new OneToManyLoader({
   extractKey: (item) => item.authorId
 })
 
+const booksByAuthorIdAccessor = new OneToManyLoader({
+  fetch: async (keys: number[]) => {
+    const allbooks = await getData('books')
+    return allbooks.filter(book => keys.includes(book.authorId))
+  },
+  extractKey: 'authorId'
+})
+
 const booksByAuthorIdMatchKey = new OneToManyLoader({
   fetch: async (keys: number[], filters: BookFilter) => {
     const allbooks = await getData('books')
@@ -52,6 +60,14 @@ const booksById = new PrimaryKeyLoader({
     const allbooks = await getData('books')
     return allbooks.filter(book => ids.includes(book.id))
   }
+})
+
+const booksByIdAccessor = new PrimaryKeyLoader({
+  fetch: async (ids: number[]) => {
+    const allbooks = await getData('books')
+    return allbooks.filter(book => ids.includes(book.id))
+  },
+  extractId: 'id'
 })
 
 const booksByIdAndTitle = new PrimaryKeyLoader({
@@ -93,6 +109,15 @@ const booksByGenre = new ManyToManyLoader({
   },
   extractKeys: book => book.genres,
   idLoader: booksById
+})
+
+const booksByGenreAccessor = new ManyToManyLoader({
+  fetch: async (genres: string[]) => {
+    const allbooks = await getData('books')
+    const books = allbooks.filter(book => book.genres.some((genre: string) => genres.includes(genre)))
+    return books
+  },
+  extractKeys: 'genres'
 })
 
 const booksByGenreMatchKey = new ManyToManyLoader({
@@ -235,5 +260,17 @@ describe('bookloader', () => {
     const book2 = await factory.get(booksById).load(3)
     expect(byIdCount).to.equal(2)
     expect(book2!.id).to.equal(3)
+  })
+  it('should be able to use an accessor string in a PrimaryKeyLoader', async () => {
+    const book = await factory.get(booksByIdAccessor).load(1)
+    expect(book).to.not.be.undefined
+  })
+  it('should be able to use an accessor string in a OneToManyLoader', async () => {
+    const books = await factory.get(booksByAuthorIdAccessor).load(1)
+    expect(books.length).to.be.greaterThan(0)
+  })
+  it('should be able to use an accessor string in a ManyToManyLoader', async () => {
+    const books = await factory.get(booksByGenreAccessor).load('fantasy')
+    expect(books.length).to.equal(3)
   })
 })

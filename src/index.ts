@@ -2,6 +2,8 @@
 import stringify from 'fast-json-stable-stringify'
 import DataLoader from 'dataloader'
 
+type MatchingKeyof<T, V> = keyof { [ P in keyof T as T[P] extends V ? P : never ]: P }
+
 export abstract class Loader<KeyType, ReturnType, FilterType> {
   public idLoaders: PrimaryKeyLoader<any, ReturnType>[]
 
@@ -18,14 +20,21 @@ export abstract class Loader<KeyType, ReturnType, FilterType> {
 
 export interface LoaderConfig<KeyType, ReturnType> {
   fetch: (ids: KeyType[], context: any) => Promise<ReturnType[]>
-  extractId?: (item: ReturnType) => KeyType
+  extractId?: MatchingKeyof<ReturnType, KeyType>|((item: ReturnType) => KeyType)
   idLoader?: PrimaryKeyLoader<any, ReturnType>|PrimaryKeyLoader<any, ReturnType>[]
   options?: DataLoader.Options<KeyType, ReturnType, string>
 }
 export class PrimaryKeyLoader<KeyType, ReturnType> extends Loader<KeyType, ReturnType, never> {
+  extractId: (obj: ReturnType) => KeyType
+
   constructor (public config: LoaderConfig<KeyType, ReturnType>) {
     super(config)
-    this.extractId = config.extractId ?? defaultId
+    const extractId = config.extractId ?? defaultId
+    if (typeof extractId === 'function') {
+      this.extractId = extractId
+    } else {
+      this.extractId = (itm: any) => itm[extractId]
+    }
     this.config.options = {
       ...this.config.options,
       maxBatchSize: config.options?.maxBatchSize ?? 1000,
@@ -56,8 +65,6 @@ export class PrimaryKeyLoader<KeyType, ReturnType> extends Loader<KeyType, Retur
   getDataLoader (cached: DataLoader<KeyType, ReturnType|undefined, string>) {
     return cached
   }
-
-  extractId: (obj: ReturnType) => KeyType
 }
 
 export interface ManyJoinedType<KeyType, ReturnType> {
@@ -131,7 +138,7 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
 
 export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ReturnType[]>
-  extractKey?: (item: ReturnType) => KeyType
+  extractKey?: MatchingKeyof<ReturnType, KeyType>|((item: ReturnType) => KeyType)
   matchKey?: (key: KeyType, item: ReturnType) => boolean
 }
 export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extends BaseManyLoader<KeyType, ReturnType, FilterType> {
@@ -148,10 +155,15 @@ export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extend
         return ret
       }
     } else if (config.extractKey) {
+      if (typeof config.extractKey !== 'function') {
+        const extractKey = config.extractKey
+        config.extractKey = (itm: any) => itm[extractKey]
+      }
+      const extractFn = config.extractKey as (itm: ReturnType) => KeyType
       this.groupItems = (items: ReturnType[]) => {
         const ret = {}
         for (const item of items) {
-          pushRecord(ret, this.config.cacheKeyFn!(config.extractKey!(item)), item)
+          pushRecord(ret, this.config.cacheKeyFn!(extractFn(item)), item)
         }
         return ret
       }
@@ -188,7 +200,7 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
 
 export interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ReturnType[]>
-  extractKeys?: (item: ReturnType) => KeyType[]
+  extractKeys?: MatchingKeyof<ReturnType, KeyType[]>|((item: ReturnType) => KeyType[])
   matchKey?: (key: KeyType, item: ReturnType) => boolean
 }
 export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> extends BaseManyLoader<KeyType, ReturnType, FilterType> {
@@ -205,10 +217,16 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
         return ret
       }
     } else if (config.extractKeys) {
+      if (typeof config.extractKeys !== 'function') {
+        const extractKeys = config.extractKeys
+        config.extractKeys = (itm: any) => itm[extractKeys]
+      }
+      const extractFn = config.extractKeys as (itm: ReturnType) => KeyType[]
+
       this.groupItems = (items: ReturnType[]) => {
         const ret = {}
         for (const item of items) {
-          for (const key of config.extractKeys!(item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
+          for (const key of extractFn(item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
         }
         return ret
       }

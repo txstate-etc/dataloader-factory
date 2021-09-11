@@ -11,7 +11,10 @@ object.
 
 ## Upgrading from 3.0
 
-The 4.0 release is a major API revision that focuses on the typescript-safe API outlined in this README. The old string-based `.register` and `.get` and `.getOneToMany` and etc are all gone. You'll need to update your code to change over to the new API, but the configuration options have not changed (except `matchKey` has been removed from the `ManyJoinedLoader` since it doesn't make sense).
+The 4.0 release is a major API revision that focuses on the typescript-safe API outlined in this
+README. The old string-based `.register` and `.get` and `.getOneToMany` and etc are all gone. You'll
+need to update your code to change over to the new API, but the configuration options have not changed
+(except `matchKey` has been removed from the `ManyJoinedLoader` since it doesn't make sense).
 
 ```javascript
 DataLoaderFactory.register('youruniquestring', { /* your config */ })
@@ -24,10 +27,12 @@ const myLoader = new PrimaryKeyLoader({ /* your config */ })
 // inside your resolvers
   factory.get(myLoader).load(id)
 ```
-The transition is very similar for the many-to-many types, except all the `.getOneToMany`, `.getManyToMany`, etc, have been replaced with a simple `.get` for simplicity.
+The transition is very similar for the many-to-many types, except all the `.getOneToMany`,
+`.getManyToMany`, etc, have been replaced with a simple `.get` for simplicity.
 
 ### If you were using typesafe classes already
-Note that `factory.getMany`, from the 3.0 typesafe class API has been replaced in all cases by `factory.get`.
+Note that `factory.getMany`, from the 3.0 typesafe class API has been replaced in all cases
+by `factory.get`.
 ```javascript
 const myOneToManyLoader = new OneToManyLoader({ /* your config */ })
 // inside your resolvers
@@ -41,7 +46,10 @@ const myOneToManyLoader = new OneToManyLoader({ /* your config */ })
 ```
 
 ## Basic Usage (Load by Primary Key)
-Each potential dataloader in your system must be created at startup. The `*Loader` classes are tightly coupled with `DataLoaderFactory`. You can spread your `*Loader` configurations out into any file structure you like, just export the instance so you can import it for your resolvers.
+Each potential dataloader in your system must be created at startup. The `*Loader` classes
+are tightly coupled with `DataLoaderFactory`. You can spread your `*Loader` configurations
+out into any file structure you like, just export the instance so you can import it for your
+resolvers.
 
 ```javascript
 import { PrimaryKeyLoader } from 'dataloader-factory'
@@ -68,6 +76,41 @@ export const bookAuthorResolver = (book, args, context) => {
   return context.dataLoaderFactory.get(authorLoader).load(book.authorId)
 }
 ```
+### Note about extractId
+Let's take a moment to discuss the `extractId` configuration option as shown in the above
+example. I find that it is a common sticking point for people first learning about building
+graphql APIs with dataloader-factory.
+
+If you've read the documentation for dataloader (and I hope you have!), you'll recall that the
+batch function you give to a dataloader is required to return results in the exact same order
+as the keys that were provided, and the return array should have undefined in it for any keys
+that didn't turn out to exist.
+
+So if you get the array `[2, 1, 3]`, and 3 doesn't exist in your database, you must return
+`[{ id: 2, ...moredata }, { id: 1, ...moredata }, undefined]`
+
+The typical performant pattern for that is:
+```typescript
+const myKeyLoader = new DataLoader(async (keys) => {
+  const rows = await lookupKeysInDatabase(keys)
+  const rowsByKey = results.reduce((rowsByKey, row) => ({ ...rowsByKey, [row.myKey]: row }), {})
+  return keys.map(k => rowsByKey[k])
+})
+```
+I find that pattern to be quite repetitive and ugly, even if you replace the reduce with
+`lodash.groupby` or the like. Furthermore, the one-to-many and many-to-many patterns are a
+little more complicated to unwind. So dataloader-factory handles that part for you. Your batch
+function only has to return a set of rows, and they'll get properly sorted and formatted for
+dataloader automatically.
+
+The only thing I need from you to make that happen is a function that tells me which property
+represents the key that we were batching on. That's why `extractId` (or `extractKey(s)` in the
+other loader types) is part of the configuration. In the example above, we were batching on `myKey`
+so the `extractId` function would be `row => row.myKey`.
+
+You can also specify a string `extractId: 'myKey'` instead of a function and that'll work. Or
+if your key is the highly typical `'id'` or `'_id'`, you don't even need to specify `extractId`
+because I'll look for those anyway (in that order of preference).
 ### Options
 The `PrimaryKeyLoader` constructor accepts the following input:
 ```typescript
@@ -106,7 +149,8 @@ new ApolloServer({
 
 ## One-to-Many DataLoaders
 The `PrimaryKeyLoader` is only appropriate for primary key lookups (or another key that
-identifies exactly one record). To fetch relations that return an array, a more complex pattern is required.
+identifies exactly one record). To fetch relations that return an array, a more complex pattern
+is required.
 
 The first of these patterns is the one-to-many pattern. Use it when your fetch function returns
 objects that will each map to a single key value. For instance, a page always exists inside a
