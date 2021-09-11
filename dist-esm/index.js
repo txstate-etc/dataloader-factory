@@ -1,0 +1,10 @@
+import dlf from '../lib/index.js'
+
+export const DataLoaderFactory = dlf.DataLoaderFactory
+export const PrimaryKeyLoader = dlf.PrimaryKeyLoader
+export const ManyToManyLoader = dlf.ManyToManyLoader
+export const ManyJoinedLoader = dlf.ManyJoinedLoader
+export const OneToManyLoader = dlf.OneToManyLoader
+
+export const Loader = dlf.Loader
+export const BaseManyLoader = dlf.BaseManyLoader
