@@ -81,7 +81,7 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
   constructor (public config: BaseManyLoaderConfig<KeyType, ReturnType>) {
     super(config)
     this.config.cacheKeyFn ??= stringify
-    this.config.maxBatchSize ??= 1000;
+    this.config.maxBatchSize ??= (config as any).matchKey ? 50 : 1000;
     (this.config as any).useCache = !this.config.skipCache
   }
 

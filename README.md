@@ -27,29 +27,24 @@ const myLoader = new PrimaryKeyLoader({ /* your config */ })
 // inside your resolvers
   factory.get(myLoader).load(id)
 ```
-The transition is very similar for the many-to-many types, except all the `.getOneToMany`,
-`.getManyToMany`, etc, have been replaced with a simple `.get` for simplicity.
+The transition is very similar for the array-returning types, except all the `.getOneToMany`,
+`.getManyToMany`, etc, have been removed since `.get()` is simpler and can cover everything
+in 4.0.
 
 ### If you were using typesafe classes already
-Note that `factory.getMany`, from the 3.0 typesafe class API has been replaced in all cases
-by `factory.get`.
+If you were aready on the typesafe API, all you need to handle is that `factory.getMany` has
+been replaced in all cases by `factory.get`.
 ```javascript
-const myOneToManyLoader = new OneToManyLoader({ /* your config */ })
-// inside your resolvers
-  factory.getMany(myOneToManyLoader, args).load(id)
+factory.getMany(myOneToManyLoader, args).load(id)
 ```
 should be replaced with
 ```javascript
-const myOneToManyLoader = new OneToManyLoader({ /* your config */ })
-// inside your resolvers
-  factory.get(myOneToManyLoader, args).load(id)
+factory.get(myOneToManyLoader, args).load(id)
 ```
 
 ## Basic Usage (Load by Primary Key)
-Each potential dataloader in your system must be created at startup. The `*Loader` classes
-are tightly coupled with `DataLoaderFactory`. You can spread your `*Loader` configurations
-out into any file structure you like, just export the instance so you can import it for your
-resolvers.
+You can spread your `*Loader` configurations out into any file structure you like, just
+create and export an instance of each type of loader, so you can import it in your resolvers.
 
 ```javascript
 import { PrimaryKeyLoader } from 'dataloader-factory'
@@ -76,41 +71,10 @@ export const bookAuthorResolver = (book, args, context) => {
   return context.dataLoaderFactory.get(authorLoader).load(book.authorId)
 }
 ```
-### Note about extractId
-Let's take a moment to discuss the `extractId` configuration option as shown in the above
-example. I find that it is a common sticking point for people first learning about building
-graphql APIs with dataloader-factory.
-
-If you've read the documentation for dataloader (and I hope you have!), you'll recall that the
-batch function you give to a dataloader is required to return results in the exact same order
-as the keys that were provided, and the return array should have undefined in it for any keys
-that didn't turn out to exist.
-
-So if you get the array `[2, 1, 3]`, and 3 doesn't exist in your database, you must return
-`[{ id: 2, ...moredata }, { id: 1, ...moredata }, undefined]`
-
-The typical performant pattern for that is:
-```typescript
-const myKeyLoader = new DataLoader(async (keys) => {
-  const rows = await lookupKeysInDatabase(keys)
-  const rowsByKey = results.reduce((rowsByKey, row) => ({ ...rowsByKey, [row.myKey]: row }), {})
-  return keys.map(k => rowsByKey[k])
-})
-```
-I find that pattern to be quite repetitive and ugly, even if you replace the reduce with
-`lodash.groupby` or the like. Furthermore, the one-to-many and many-to-many patterns are a
-little more complicated to unwind. So dataloader-factory handles that part for you. Your batch
-function only has to return a set of rows, and they'll get properly sorted and formatted for
-dataloader automatically.
-
-The only thing I need from you to make that happen is a function that tells me which property
-represents the key that we were batching on. That's why `extractId` (or `extractKey(s)` in the
-other loader types) is part of the configuration. In the example above, we were batching on `myKey`
-so the `extractId` function would be `row => row.myKey`.
-
-You can also specify a string `extractId: 'myKey'` instead of a function and that'll work. Or
-if your key is the highly typical `'id'` or `'_id'`, you don't even need to specify `extractId`
-because I'll look for those anyway (in that order of preference).
+When you pass an instance of one of the `*Loader` classes to `dataLoaderFactory.get()`,
+dataloader-factory will use the configuration information it contains to create and
+cache instances of `DataLoader` for you, generating a brand new set of `DataLoader`s for
+every new request.
 ### Options
 The `PrimaryKeyLoader` constructor accepts the following input:
 ```typescript
@@ -135,9 +99,51 @@ const myLoader = new PrimaryKeyLoader<IdType, ObjectType>({
   options: DataLoader.Options
 })
 ```
-To set the pass-through `context` mentioned for the `fetch` function above, pass it in when you
-construct each new `dataLoaderFactory`, and then it will be passed to your fetch functions for
-convenience.
+### Note about extractId
+Let's take a moment to discuss the `extractId` configuration option as shown in the above
+example. I find that it is a common sticking point for people first learning about building
+graphql APIs with dataloader-factory.
+
+If you've read the [documentation for dataloader](https://github.com/graphql/dataloader) (and
+I hope you have!), you'll recall that the batch function you give to a dataloader is required
+to return results in the exact same order as the keys that were provided, and the return array
+should have undefined in it for any keys that didn't turn out to exist.
+
+So if you get the array `[2, 1, 3]`, and 3 doesn't exist in your database, you must return
+`[{ myKey: 2, ...moredata }, { myKey: 1, ...moredata }, undefined]`
+
+The typical performant pattern for that is:
+```typescript
+const myKeyLoader = new DataLoader(async (keys) => {
+  const rows = await lookupKeysInDatabase(keys)
+  const rowsByKey = results.reduce((rowsByKey, row) => ({ ...rowsByKey, [row.myKey]: row }), {})
+  return keys.map(k => rowsByKey[k])
+})
+```
+I find that pattern to be quite repetitive and ugly, even if you replace the reduce with
+`lodash.groupby` or the like. Furthermore, the one-to-many and many-to-many patterns are a
+little more complicated to unwind. So dataloader-factory handles that part for you. Your `fetch`
+function only has to return a set of rows, and they'll get properly sorted and formatted for
+dataloader automatically.
+
+The only thing I need from you to make that happen is a function that tells me which property
+represents the key that we were batching on. That's why `extractId` (or `extractKey(s)` in the
+other loader types) is part of the configuration. In the example above, we were batching on `myKey`
+so the `extractId` function would be `row => row.myKey`.
+
+You can also specify a string `extractId: 'myKey'` instead of a function and that'll work. Or
+if your key is the highly typical `'id'` or `'_id'`, you don't even need to specify `extractId`
+because I'll look for those anyway (in that order of preference).
+
+### Pass-through Context
+In the Options section above, you may have noticed that the `fetch` function receives a `context`
+parameter. This is an extra option for you to be able to pass information from the request context
+through to your `fetch` function, in case you have filters that are context-sensitive, like a dataloader
+for fetching friendships of the current user or one that needs to fetch only records the current
+user is authorized to read.
+
+To set the pass-through `context`, pass it in when you construct a new `dataLoaderFactory` instance,
+and then it will be passed to your fetch functions.
 ```javascript
 new ApolloServer({
   context: req => {
@@ -152,9 +158,10 @@ The `PrimaryKeyLoader` is only appropriate for primary key lookups (or another k
 identifies exactly one record). To fetch relations that return an array, a more complex pattern
 is required.
 
-The first of these patterns is the one-to-many pattern. Use it when your fetch function returns
-objects that will each map to a single key value. For instance, a page always exists inside a
-single book, so the `pagesByBookId` implementation might look like this:
+The first of these patterns is the one-to-many pattern. Use it when you have a one to many
+relationship you're trying to map, and your fetch function returns objects that will each map to
+a single key value. For instance, a page always exists inside a single book, so the
+`pagesByBookId` implementation might look like this:
 ```javascript
 import { OneToManyLoader } from 'dataloader-factory'
 const pagesByBookIdLoader = new OneToManyLoader({
@@ -178,11 +185,11 @@ links a book and a library and additionally lists a date the book was purchased.
 dataloader for `book -> acquisition` is one-to-many, the dataloader for `library -> acquisition` is
 one-to-many, and for `book -> library` the developer has the option of chaining
 `book -> acquisition -> library` or creating a new many-to-many dataloader that uses a database join
-for efficiency (see the "Many-to-Many-Joined" section below).
+to save a round trip (see the "Many-to-Many-Joined" section below).
 
 ### Options
 The `OneToManyLoader` constructor accepts the following inputs. All of the *-to-many patterns accept the
-same options, except as noted in their section of the documentation.
+same options, except as specifically noted in their section of the documentation.
 ```typescript
 const myOneToManyLoader = new OneToManyLoader<KeyType, ObjectType, FilterType>({
   // accept arbitrary foreign keys and arbitrary arguments and return results
@@ -192,7 +199,7 @@ const myOneToManyLoader = new OneToManyLoader<KeyType, ObjectType, FilterType>({
   fetch: async (keys: KeyType[], filters: FilterType, context) => ObjectType[] // required
 
   // function that can pull the foreign key out of the result object
-  // must match the interface of the keys you're using in your fetch function
+  // must match the type of the keys you're using in your fetch function
   extractKey: (item: ObjectType) => item.authorId // required
 
   // advanced usage only, covered later in this readme
@@ -308,10 +315,22 @@ const booksByAuthorId = new DataLoader(async (authorIds) => {
 })
 ```
 Easy so far, but adding the `genre: "mystery"` filter is not obvious and can be very confusing to
-implement.
+implement. You can only batch on one key at a time, so how are you supposed to batch when you have
+both an authorId and a genre to filter with?
 
-Using dataloader-factory, it's fairly simple; the resolver would look like this (ignore the overly
-simplistic data model):
+Since `genre: "mystery"` is the argument, and `authors` is the array in this query, clearly we want
+to batch on `authorId`. But if I call `.load(authorId)`, how am I going to pass the genre to the
+batch function? I could try something like `.load({ authorId, genre })`, but transforming that into
+SQL is going to be a nightmare as the number of filters gets larger.
+
+The answer is actually to create a new DataLoader instance for each unique set of extra filtering
+arguments. So in the genre case, we need a DataLoader for mysteries, another DataLoader for fantasy,
+and so on.  Since we don't want to hard-code an exhaustive list of genres, we need a function that
+can generate new DataLoaders, and since we don't want to use infinite RAM, it should do so on demand.
+Well we're in luck, because that's exactly what dataloader-factory was built to do!
+
+So using dataloader-factory, it becomes fairly simple; the resolver would look like this (ignore the
+overly simplistic data model):
 ```javascript
 import { OneToManyLoader } from 'dataloader-factory'
 const booksByAuthorIdLoader = new OneToManyLoader({
@@ -330,13 +349,18 @@ export const authorBooksResolver = (author, args, context) => {
   return context.dataLoaderFactory.get(booksByAuthorIdLoader, args).load(author.id)
 }
 ```
-Behind the scenes, what this does is generate a distinct dataloader instance for each set of args used on that resolver. Since a graphql query is always finite, and each request gets a new factory, the number of possible dataloaders generated is finite and manageable as well.
+Behind the scenes, what this does is generate a distinct DataLoader instance for each set of
+args we encounter. Generating so many DataLoaders may seem like a problem, but remember -
+graphql queries are always finite, so there can only be a few sets of arguments in any one request,
+and each request gets a new factory. So the number of possible dataloaders generated per request is
+manageable, and they all get garbage collected after the request.
 
 ## Advanced Usage Example
 Many GraphQL data types will have more than one other type referencing them. In those
-cases, it will probably be useful to create a single function for constructing and
-executing the query, and each `fetch` function will simply add the batched `keys` to
-the `filters` object, and then pass the merged `filters` to the single function.
+cases, it will probably be useful to create a single function that accepts a set of `filters`
+and uses it to construct and execute a database query. Then each `fetch` function can simply
+merge the batch of `keys` into the `filters` object, and pass the merged object to the
+query function. This example should help illustrate:
 ```javascript
 const executeBookQuery = filters => {
   const where = []
@@ -369,6 +393,8 @@ const booksByGenreLoader = new OneToManyLoader({
   extractKey: item => item.genre
 })
 ```
+See how executeBookQuery is re-usable no matter how many different types of filtering we add? You don't
+have to use this pattern but I find it very helpful.
 
 ## Compound Keys
 Compound Keys are fully supported. Any key object will be accepted. It is up to your `fetch` and
@@ -376,15 +402,16 @@ Compound Keys are fully supported. Any key object will be accepted. It is up to 
 results, which will construct the same string even if two objects' keys have mismatching ordering.
 
 ## matchKey
-In rare cases it may be that a key cannot be extracted from an item because
-an irreversible operation is involved (like evaluating greater than or less than)
+In rare cases it may be that you are unable to provide an `extractKey` function because a key
+cannot be extracted from an item because an irreversible operation is involved (like evaluating
+greater than or less than)
 
-In those cases, you can provide a `matchKey` function that examines
-whether the result object is a match for the given key. The answer
-will help us put the fetched dataset back together properly.
+In those cases, you can provide a `matchKey` function that examines whether the result object is
+a match for the given key. The answer will help us put the fetched dataset back together properly.
 
 Please note that this makes the batched load an O(n^2) operation so `extractKey` is
-preferred whenever possible and a smaller `maxBatchSize` would be wise.
+preferred whenever possible. If you use `matchKey`, the `maxBatchSize` default will change to 50
+to help limit scaling problems.
 ```javascript
 const booksAfterYearLoader = new OneToManyLoader({
   fetch: (years, filters) => {
@@ -416,14 +443,17 @@ const books = await ctx.loaders.loadMany(booksByAuthorLoader, authorIds, filters
 ## Mutations
 In graphql, after a mutation there will be a query, which can be very complex. If this query
 is evaluated after you have already done some dataloading (e.g. to find related objects to help
-authorize the mutation), you will want to get rid of any cache that was fetched before the mutation
-completed. Creating a new DataLoaderFactory instance is one way, but probably cumbersome. Instead
-of replacing your instance, you can call `.clear()` on your instance and all your existing
-dataloaders will be tossed so that your post-mutation query can run against fresh data.
+authorize the mutation), you will want to get rid of any cached objects that were fetched before
+the mutationcompleted. Creating a new DataLoaderFactory instance is one way, but probably
+cumbersome. Instead of replacing your instance, you can call `.clear()` on your instance and all
+your existing dataloaders will be tossed so that your post-mutation query can run against fresh
+data.
 
 ## TypeScript
 This library is written in typescript and provides its own types. When you create a new loader type,
-you can choose whether to provide your types as generics, which will help you write your `fetch` function properly, or you can write your `fetch` function and its input/return types will be used implicitly for everything else.
+you can choose whether to provide your types as generics, which will help you write your `fetch`
+function properly, or you can write your `fetch` function and its input/return types will be used
+implicitly for everything else.
 ```typescript
 import { PrimaryKeyLoader } from 'dataloader-factory'
 const bookLoader = new PrimaryKeyLoader({
