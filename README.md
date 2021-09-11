@@ -105,7 +105,7 @@ example. I find that it is a common sticking point for people first learning abo
 graphql APIs with dataloader-factory.
 
 If you've read the [documentation for dataloader](https://github.com/graphql/dataloader) (and
-I hope you have!), you'll recall that the batch function you give to a dataloader is required
+I hope you have!), you'll recall that the batch function you give to new DataLoader is required
 to return results in the exact same order as the keys that were provided, and the return array
 should have undefined in it for any keys that didn't turn out to exist.
 
@@ -121,7 +121,7 @@ const myKeyLoader = new DataLoader(async (keys) => {
 })
 ```
 I find that pattern to be quite repetitive and ugly, even if you replace the reduce with
-`lodash.groupby` or the like. Furthermore, the one-to-many and many-to-many patterns are a
+`lodash.groupBy` or the like. Furthermore, the one-to-many and many-to-many patterns are a
 little more complicated to unwind. So dataloader-factory handles that part for you. Your `fetch`
 function only has to return a set of rows, and they'll get properly sorted and formatted for
 dataloader automatically.
@@ -345,15 +345,21 @@ const booksByAuthorIdLoader = new OneToManyLoader({
   },
   extractKey: book => book.authorId
 })
-export const authorBooksResolver = (author, args, context) => {
-  return context.dataLoaderFactory.get(booksByAuthorIdLoader, args).load(author.id)
+export const authorBooksResolver = (author, filters, context) => {
+  return context.dataLoaderFactory.get(booksByAuthorIdLoader, filters).load(author.id)
 }
 ```
-Behind the scenes, what this does is generate a distinct DataLoader instance for each set of
-args we encounter. Generating so many DataLoaders may seem like a problem, but remember -
-graphql queries are always finite, so there can only be a few sets of arguments in any one request,
-and each request gets a new factory. So the number of possible dataloaders generated per request is
-manageable, and they all get garbage collected after the request.
+Note that the arguments we get from GraphQL get passed to the `.get()` function, NOT the
+`.load()` function. The `.load()` function belongs to DataLoader. I don't change it in any way.
+The `.get()` function stringifies the filters and uses that as a key to determine whether a new
+DataLoader should be constructed. Then the filters get passed (unstringified) to the fetch
+function so it can use them to do its work.
+
+What this does is generate a distinct DataLoader instance for each set of GraphQL arguments we
+encounter. Generating so many DataLoaders may seem like a problem, but remember - graphql
+queries are always finite, so there can only be a few sets of arguments in any one request,
+and each request gets a new factory. So the number of possible dataloaders generated per request
+is manageable, and they all get garbage collected after the request.
 
 ## Advanced Usage Example
 Many GraphQL data types will have more than one other type referencing them. In those
