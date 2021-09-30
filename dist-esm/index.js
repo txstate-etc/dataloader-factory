@@ -1,4 +1,4 @@
-import dlf from '../lib/index.js'
+import dlf from '../dist/index.js'
 
 export const DataLoaderFactory = dlf.DataLoaderFactory
 export const PrimaryKeyLoader = dlf.PrimaryKeyLoader

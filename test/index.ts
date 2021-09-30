@@ -18,6 +18,7 @@ interface Book {
 
 interface BookFilter {
   genre: string
+  authorIds?: number[]
 }
 
 async function getData (type: 'books'): Promise<Book[]>
@@ -34,6 +35,7 @@ const booksByAuthorId = new OneToManyLoader({
     const allbooks = await getData('books')
     return allbooks.filter(book => keys.includes(book.authorId) && book.genres.includes(filters.genre))
   },
+  keysFromFilter: (filters) => filters?.authorIds ?? [],
   extractKey: (item) => item.authorId
 })
 
@@ -272,5 +274,9 @@ describe('bookloader', () => {
   it('should be able to use an accessor string in a ManyToManyLoader', async () => {
     const books = await factory.get(booksByGenreAccessor).load('fantasy')
     expect(books.length).to.equal(3)
+  })
+  it('should filter based on the batch id automatically if keysFromFilter provided', async () => {
+    const books = await factory.get(booksByAuthorId, { genre: 'mystery', authorIds: [5] }).load(2)
+    expect(books.length).to.equal(0)
   })
 })

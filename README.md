@@ -9,39 +9,6 @@ In addition, it takes on the burden of putting results into the correct order fo
 having you specify an `extractId` or `extractKey` function to teach it where the id is in your data
 object.
 
-## Upgrading from 3.0
-
-The 4.0 release is a major API revision that focuses on the typescript-safe API outlined in this
-README. The old string-based `.register` and `.get` and `.getOneToMany` and etc are all gone. You'll
-need to update your code to change over to the new API, but the configuration options have not changed
-(except `matchKey` has been removed from the `ManyJoinedLoader` since it doesn't make sense).
-
-```javascript
-DataLoaderFactory.register('youruniquestring', { /* your config */ })
-// inside your resolvers
-  factory.get('youruniquestring').load(id)
-```
-should be replaced with
-```javascript
-const myLoader = new PrimaryKeyLoader({ /* your config */ })
-// inside your resolvers
-  factory.get(myLoader).load(id)
-```
-The transition is very similar for the array-returning types, except all the `.getOneToMany`,
-`.getManyToMany`, etc, have been removed since `.get()` is simpler and can cover everything
-in 4.0.
-
-### If you were using typesafe classes already
-If you were aready on the typesafe API, all you need to handle is that `factory.getMany` has
-been replaced in all cases by `factory.get`.
-```javascript
-factory.getMany(myOneToManyLoader, args).load(id)
-```
-should be replaced with
-```javascript
-factory.get(myOneToManyLoader, args).load(id)
-```
-
 ## Basic Usage (Load by Primary Key)
 You can spread your `*Loader` configurations out into any file structure you like, just
 create and export an instance of each type of loader, so you can import it in your resolvers.
@@ -152,7 +119,39 @@ new ApolloServer({
   }
 })
 ```
+### Note about idLoader
+The idLoader configuration is there to help you keep your dataloaders properly primed. For
+instance, say you have a loader for fetching books by their authorId. Well, those books
+that got returned have all their data, so there's no reason why you should go back to the
+database if a later part of the query asks for one of the books by id. To make sure we can
+re-use books fetched by authorId, we need to prime the id loader with the results of the
+authorId loader. We do that with the `idLoader` configuration option on the authorId loader:
 
+```typescript
+const booksByIdLoader = new PrimaryKeyLoader({ ... configuration ... })
+const booksByAuthorIdLoader = new OneToManyLoader({
+  // ... regular configuration for the loader ...
+  idLoader: booksByIdLoader
+})
+```
+Now dataloader-factory will automatically keep `booksByIdLoader` primed with anything fetched
+by booksByAuthorIdLoader.
+
+It's also possible that you have two good unique keys for a data type. For example, a book might
+have an internal auto_increment id in your system, plus its ISBN identifier used by the rest
+of the world. You probably want to have the book cached no matter which identifier gets queried.
+
+It's a little more complicated to pull this off because you can't set the idLoader on whichever
+loader you make first, because the second loader won't exist yet. For this case, PrimaryKeyLoader
+offers a method `.addIdLoader(loader)` so you can add it after creation:
+```typescript
+const booksByIdLoader = new PrimaryKeyLoader({ /* configuration */ })
+const booksByISBNLoader = new PrimaryKeyLoader({
+  // ... configuration ...
+  idLoader: booksByIdLoader
+})
+booksByIdLoader.addIdLoader(booksByISBNLoader)
+```
 ## One-to-Many DataLoaders
 The `PrimaryKeyLoader` is only appropriate for primary key lookups (or another key that
 identifies exactly one record). To fetch relations that return an array, a more complex pattern
@@ -205,6 +204,9 @@ const myOneToManyLoader = new OneToManyLoader<KeyType, ObjectType, FilterType>({
   // advanced usage only, covered later in this readme
   matchKey: (key: KeyType, item: ObjectType) => boolean
 
+  // see below section titled "Note about filter and batch overlap"
+  keysFromFilter: (filters: FilterType) => KeyType[]
+
   // generated dataloaders will not keep a cache, batch only
   skipCache: false
 
@@ -219,7 +221,7 @@ const myOneToManyLoader = new OneToManyLoader<KeyType, ObjectType, FilterType>({
   // be primed with any results gathered
   // NOTE: if the above fetch function returns result objects that differ from those of
   // the specified loader(s), it's going to cause you problems
-  idLoader: PrimaryKeyLoader|PrimaryKeyLoader[],
+  idLoader: PrimaryKeyLoader|PrimaryKeyLoader[]
 })
 ```
 Note that `KeyType` can be anything serializable, so you can use arrays or objects for any compound keys you may have.
@@ -402,6 +404,49 @@ const booksByGenreLoader = new OneToManyLoader({
 See how executeBookQuery is re-usable no matter how many different types of filtering we add? You don't
 have to use this pattern but I find it very helpful.
 
+### Note about filter and batch overlap
+One situation that pops up when you start using this strategy and allowing filters on field resolvers
+is your users can start writing queries that don't make a lot of sense:
+```graphql
+{ genres {
+    name
+    books (genres: ["mystery", "fantasy"]) {
+      name
+    }
+}}
+```
+This doesn't make a lot of sense because you're going to get results like:
+```javascript
+[{
+  name: 'nonfiction',
+  books: [ /* only books tagged with nonfiction AND mystery or fantasy */ ]
+},{
+  name: 'mystery',
+  books: [ /* all the books you'd expect */ ]
+}, /* etc */]
+```
+Even then, making it work that way is complicated. It translates to SQL like
+`genre IN (... batchedGenres ...) AND genre IN ('mystery','fantasy')`, which can
+be a pain to try to generate.
+
+dataloader-factory has one more trick up its sleeve for this if you opt to use it. Simply
+provide a `keysFromFilter` function that takes your `filters` object and returns the key or
+keys exactly as `extractKey` would return the key from the model:
+```typescript
+const booksByGenreLoader = new ManyToManyLoader({
+  fetch: async (genres, filters) => await executeBookQuery({ ...filters, genres }),
+  extractKeys: book => book.genres,
+  keysFromFilter: filters => filters.genres
+})
+```
+When you provide `keysFromFilter`, dataloader-factory will perform application-side filtering to
+remove any objects that don't match your filter (it uses the cacheKeyFn to compare them). Your
+database query need only worry about the batch keys.
+
+Note that in my fetch function above I write `executeBookQuery({ ...filters, genres })`. Order is
+important in that merge operation, as the batch keys MUST overwrite the corresponding filter
+parameter, not the other way around.
+
 ## Compound Keys
 Compound Keys are fully supported. Any key object will be accepted. It is up to your `fetch` and
 `extractKey` functions to treat it properly. Internally, fast-json-stable-stringify is used to cache
@@ -490,4 +535,37 @@ export const authorBooksResolver = (author, args, context) => {
   // Promise<YourBookType>
   return context.dataLoaderFactory.get(authorBooksLoader, args).load(author.id)
 }
+```
+
+## Upgrading from 3.0
+
+The 4.0 release is a major API revision that focuses on the typescript-safe API outlined in this
+README. The old string-based `.register` and `.get` and `.getOneToMany` and etc are all gone. You'll
+need to update your code to change over to the new API, but the configuration options have not changed
+(except `matchKey` has been removed from the `ManyJoinedLoader` since it doesn't make sense).
+
+```javascript
+DataLoaderFactory.register('youruniquestring', { /* your config */ })
+// inside your resolvers
+  factory.get('youruniquestring').load(id)
+```
+should be replaced with
+```javascript
+const myLoader = new PrimaryKeyLoader({ /* your config */ })
+// inside your resolvers
+  factory.get(myLoader).load(id)
+```
+The transition is very similar for the array-returning types, except all the `.getOneToMany`,
+`.getManyToMany`, etc, have been removed since `.get()` is simpler and can cover everything
+in 4.0.
+
+### If you were using typesafe classes already
+If you were aready on the typesafe API, all you need to handle is that `factory.getMany` has
+been replaced in all cases by `factory.get`.
+```javascript
+factory.getMany(myOneToManyLoader, args).load(id)
+```
+should be replaced with
+```javascript
+factory.get(myOneToManyLoader, args).load(id)
 ```

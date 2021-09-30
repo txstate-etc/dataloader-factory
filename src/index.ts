@@ -71,14 +71,15 @@ export interface ManyJoinedType<KeyType, ReturnType> {
   key: KeyType
   value: ReturnType
 }
-export interface BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface BaseManyLoaderConfig<KeyType, ReturnType, FilterType> {
   skipCache?: boolean
   maxBatchSize?: number
   cacheKeyFn?: (key: KeyType) => string
+  keysFromFilter?: (filter: FilterType|undefined) => KeyType[]
   idLoader?: PrimaryKeyLoader<any, ReturnType>|PrimaryKeyLoader<any, ReturnType>[]
 }
 export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Loader<KeyType, ReturnType, FilterType> {
-  constructor (public config: BaseManyLoaderConfig<KeyType, ReturnType>) {
+  constructor (public config: BaseManyLoaderConfig<KeyType, ReturnType, FilterType>) {
     super(config)
     this.config.cacheKeyFn ??= stringify
     this.config.maxBatchSize ??= (config as any).matchKey ? 50 : 1000;
@@ -98,6 +99,7 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
   }
 
   abstract groupItems (items: ReturnType[]|ManyJoinedType<KeyType, ReturnType>[], dedupekeys: Map<string, KeyType>): Record<string, ReturnType[]>
+  abstract filterItems (items: ReturnType[]|ManyJoinedType<KeyType, ReturnType>[], filters: FilterType|undefined): ReturnType[]|ManyJoinedType<KeyType, ReturnType>[]
 
   getDataLoader (cached: Map<string, FilteredStorageObject<KeyType, ReturnType>>, filters?: FilterType) {
     const filterstring = stringify(filters)
@@ -112,7 +114,11 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
           for (let i = 0; i < keys.length; i++) {
             dedupekeys.set(stringkeys[i], keys[i])
           }
-          const items = await (this.config as any).fetch(Array.from(dedupekeys.values()), filters, this.factory.context)
+          const items = this.filterItems(
+            await (this.config as any).fetch(Array.from(dedupekeys.values()), filters, this.factory.context),
+            filters
+          )
+
           for (const loader of this.idLoaders) {
             this.prime(loader, items)
           }
@@ -136,7 +142,7 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
   }
 }
 
-export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType, FilterType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ReturnType[]>
   extractKey?: MatchingKeyof<ReturnType, KeyType>|((item: ReturnType) => KeyType)
   matchKey?: (key: KeyType, item: ReturnType) => boolean
@@ -170,12 +176,24 @@ export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extend
     } else {
       throw new Error('Tried to create a one-to-many loader without either extractKey or matchKey defined. One of the two is required.')
     }
+    if (config.keysFromFilter != null && config.extractKey) {
+      const keysFromFilter = config.keysFromFilter
+      const extractFn = config.extractKey as (itm: ReturnType) => KeyType
+      this.filterItems = (items, filters) => {
+        const keys = new Set(keysFromFilter(filters).map(this.config.cacheKeyFn!))
+        if (keys.size === 0) return items
+        return items.filter(itm => keys.has(this.config.cacheKeyFn!(extractFn(itm))))
+      }
+    } else {
+      this.filterItems = items => items
+    }
   }
 
+  filterItems: (items: ReturnType[], filters: FilterType|undefined) => ReturnType[]
   groupItems: (items: ReturnType[], dedupekeys: Map<string, KeyType>) => Record<string, ReturnType[]>
 }
 
-export interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface ManyJoinedLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType, FilterType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ManyJoinedType<KeyType, ReturnType>[]>
 }
 export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> extends BaseManyLoader<KeyType, ReturnType, FilterType> {
@@ -191,6 +209,13 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
     return ret
   }
 
+  filterItems (items: ManyJoinedType<KeyType, ReturnType>[], filters: FilterType|undefined) {
+    if (!this.config.keysFromFilter) return items
+    const keys = new Set(this.config.keysFromFilter(filters).map(this.config.cacheKeyFn!))
+    if (keys.size === 0) return items
+    return items.filter(itm => keys.has(this.config.cacheKeyFn!(itm.key)))
+  }
+
   prime (loader: PrimaryKeyLoader<any, ReturnType>, items: ManyJoinedType<KeyType, ReturnType>[]) {
     for (const item of items) {
       this.factory.get(loader).prime(loader.extractId(item.value), item.value)
@@ -198,7 +223,7 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
   }
 }
 
-export interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType> {
+export interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType, FilterType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ReturnType[]>
   extractKeys?: MatchingKeyof<ReturnType, KeyType[]>|((item: ReturnType) => KeyType[])
   matchKey?: (key: KeyType, item: ReturnType) => boolean
@@ -233,8 +258,20 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
     } else {
       throw new Error('Tried to create a many-to-many loader without either extractKeys or matchKey defined. One of the two is required.')
     }
+    if (config.keysFromFilter != null && config.extractKeys) {
+      const keysFromFilter = config.keysFromFilter
+      const extractFn = config.extractKeys as (itm: ReturnType) => KeyType[]
+      this.filterItems = (items, filters) => {
+        const keys = new Set(keysFromFilter(filters).map(this.config.cacheKeyFn!))
+        if (keys.size === 0) return items
+        return items.filter(itm => extractFn(itm).some(k => keys.has(this.config.cacheKeyFn!(k))))
+      }
+    } else {
+      this.filterItems = items => items
+    }
   }
 
+  filterItems: (items: ReturnType[], filters: FilterType|undefined) => ReturnType[]
   groupItems: (items: ReturnType[], dedupekeys: Map<string, KeyType>) => Record<string, ReturnType[]>
 }
 
