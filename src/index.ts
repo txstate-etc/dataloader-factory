@@ -152,7 +152,7 @@ export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extend
     super(config)
     if (config.matchKey) {
       this.groupItems = (items: ReturnType[], dedupekeys: Map<string, KeyType>) => {
-        const ret = {}
+        const ret = Object.create(null)
         for (const item of items) {
           for (const key of dedupekeys.values()) {
             if (config.matchKey!(key, item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
@@ -167,7 +167,7 @@ export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extend
       }
       const extractFn = config.extractKey as (itm: ReturnType) => KeyType
       this.groupItems = (items: ReturnType[]) => {
-        const ret = {}
+        const ret = Object.create(null)
         for (const item of items) {
           pushRecord(ret, this.config.cacheKeyFn!(extractFn(item)), item)
         }
@@ -202,7 +202,7 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
   }
 
   groupItems (items: ManyJoinedType<KeyType, ReturnType>[]) {
-    const ret: Record<string, ReturnType[]> = {}
+    const ret: Record<string, ReturnType[]> = Object.create(null)
     for (const { key, value } of items) {
       pushRecord(ret, this.config.cacheKeyFn!(key), value)
     }
@@ -233,7 +233,7 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
     super(config)
     if (config.matchKey) {
       this.groupItems = (items: ReturnType[], dedupekeys: Map<string, KeyType>) => {
-        const ret = {}
+        const ret = Object.create(null)
         for (const item of items) {
           for (const key of dedupekeys.values()) {
             if (config.matchKey!(key, item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
@@ -249,7 +249,7 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
       const extractFn = config.extractKeys as (itm: ReturnType) => KeyType[]
 
       this.groupItems = (items: ReturnType[]) => {
-        const ret = {}
+        const ret = Object.create(null)
         for (const item of items) {
           for (const key of extractFn(item)) pushRecord(ret, this.config.cacheKeyFn!(key), item)
         }
