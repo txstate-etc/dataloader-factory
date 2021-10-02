@@ -476,12 +476,15 @@ const booksAfterYearLoader = new OneToManyLoader({
 
 ## loadMany
 Dataloader has a `.loadMany` method that can be used to retrieve objects based on an
-array of keys. However, it is designed to return Errors for any keys that threw an error, so
-you have to be aware of that any time you use it. Additionally, keys that do not point at any
-data will come back undefined, and you will have undefined values in the returned array.
+array of keys. However, it is designed to catch and return Errors for any keys that throw an
+error, so you have to be aware of that any time you use it. Additionally, keys that do not
+point at any data will come back undefined, and you will have undefined values in the returned
+array.
 
-To avoid both of these problems and just get an array of any of the objects that exist, a
-`.loadMany` method exists on the factory for your convenience:
+To avoid both of these problems, a `.loadMany` method exists on the factory for your convenience.
+Its return array only contains objects that exist - no undefined values. Additionally, if
+any key throws an error, `loadMany` throws the error instead of catching it and inserting it
+into the array.
 ```javascript
 const books = await ctx.loaders.loadMany(bookLoader, bookIds)
 ```
@@ -492,7 +495,8 @@ const books = await ctx.loaders.loadMany(booksByAuthorLoader, authorIds, filters
 ```
 
 ## Mutations
-In graphql, after a mutation there will be a query, which can be very complex. If this query
+In graphql, mutations have return values, and the user is able to query any number and depth of
+properties in that return object. In effect the user has a chance to make a , which may be very complex. If this query
 is evaluated after you have already done some dataloading (e.g. to find related objects to help
 authorize the mutation), you will want to get rid of any cached objects that were fetched before
 the mutationcompleted. Creating a new DataLoaderFactory instance is one way, but probably
