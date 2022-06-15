@@ -80,7 +80,7 @@ So if you get the array `[2, 1, 3]`, and 3 doesn't exist in your database, you m
 `[{ myKey: 2, ...moredata }, { myKey: 1, ...moredata }, undefined]`
 
 The typical performant pattern for that is:
-```typescript
+```javascript
 const myKeyLoader = new DataLoader(async (keys) => {
   const rows = await lookupKeysInDatabase(keys)
   const rowsByKey = results.reduce((rowsByKey, row) => ({ ...rowsByKey, [row.myKey]: row }), {})
@@ -101,6 +101,14 @@ so the `extractId` function would be `row => row.myKey`.
 You can also specify a string `extractId: 'myKey'` instead of a function and that'll work. Or
 if your key is the highly typical `'id'` or `'_id'`, you don't even need to specify `extractId`
 because I'll look for those anyway (in that order of preference).
+
+Our above pattern becomes much simpler:
+```javascript
+const myKeyLoader = new PrimaryKeyLoader({
+  fetch: async (keys) => await lookupKeysInDatabase(keys),
+  extractId: row => row.myKey
+})
+```
 
 ### Pass-through Context
 In the Options section above, you may have noticed that the `fetch` function receives a `context`
@@ -343,7 +351,7 @@ new BestMatchLoader<KeyType, ObjectType>({
   // see PrimaryKeyLoader options for discussion of context parameter
   fetch: async (keys: KeyType[], context) => ObjectType[] // required
 
-  // take the key and an object and determine how well they match
+  // take a key and an object and determine how well they match
   // each key will only pick one "winner" which will be the item that returns
   // the highest score
   // return a score of 0 when the key and item do not match at all
@@ -512,8 +520,8 @@ parameter, not the other way around.
 
 ## Compound Keys
 Compound Keys are fully supported. Any key object will be accepted. It is up to your `fetch` and
-`extractKey` functions to treat it properly. Internally, fast-json-stable-stringify is used to cache
-results, which will construct the same string even if two objects' keys have mismatching ordering.
+`extractKey` functions to treat it properly. Internally, a stable JSON stringify is used to cache
+results, so it will construct the same string even if two objects' keys have mismatching ordering.
 
 ## matchKey
 In rare cases it may be that you are unable to provide an `extractKey` function because a key
@@ -533,7 +541,6 @@ const booksAfterYearLoader = new OneToManyLoader({
     return db.query(`SELECT * FROM books WHERE ${ors.join(') OR (')}`
   },
   matchKey: (year, book) => book.published.getTime() >= new Date(year, 0, 1)
-  maxBatchSize: 20
 })
 ```
 
@@ -559,10 +566,10 @@ const books = await ctx.loaders.loadMany(booksByAuthorLoader, authorIds, filters
 
 ## Mutations
 In graphql, mutations have return values, and the user is able to query any number and depth of
-properties in that return object. In effect the user has a chance to make a , which may be very complex. If this query
-is evaluated after you have already done some dataloading (e.g. to find related objects to help
-authorize the mutation), you will want to get rid of any cached objects that were fetched before
-the mutationcompleted. Creating a new DataLoaderFactory instance is one way, but probably
+properties in that return object. In effect the user has a chance to make a new query after the mutation,
+and you may have already done some dataloading (e.g. to find related objects to help
+authorize the mutation). You will want to get rid of any cached objects that were fetched before
+the mutation completed. Creating a new DataLoaderFactory instance is one way, but probably
 cumbersome. Instead of replacing your instance, you can call `.clear()` on your instance and all
 your existing dataloaders will be tossed so that your post-mutation query can run against fresh
 data.
@@ -585,7 +592,7 @@ const bookLoader = new PrimaryKeyLoader({
 
 export const bookResolver = async (book, args, context) => {
   // typescript should know load() accepts a string
-  // and that bookResolver will return Promise<YourBookType>
+  // and that bookResolver will return Promise<IBook>
   return await context.dataLoaderFactory.get(bookLoader).load(book.authorId)
 }
 ```
@@ -593,13 +600,14 @@ The *ToMany classes work the same way, with a third generic for FilterType:
 ```typescript
 const booksByAuthorIdLoader = new OneToManyLoader({
   fetch: (authorIds: string[], filters: BookFilters) {
+    // typescript will detect ReturnType = IBook if this returns Promise<IBook[]>
     return executeBookQuery({ ...filters, authorIds })
   },
   extractKey: item => item.authorId
 })
 export const authorBooksResolver = (author, args, context) => {
-  // this next line is type-safe: args and author.id will both be checked and load will return
-  // Promise<YourBookType>
+  // typescript should know load() accepts a string
+  // and that authorBooksResolver will return Promise<IBook[]>
   return context.dataLoaderFactory.get(authorBooksLoader, args).load(author.id)
 }
 ```
