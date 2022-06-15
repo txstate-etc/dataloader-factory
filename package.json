@@ -1,6 +1,6 @@
 {
   "name": "dataloader-factory",
-  "version": "4.3.2",
+  "version": "4.4.0",
   "description": "DataLoader classes to make it easier to write complex graphql resolvers.",
   "exports": {
     "require": "./dist/index.js",
@@ -25,7 +25,6 @@
   "homepage": "https://github.com/txstate-etc/dataloader-factory#readme",
   "devDependencies": {
     "@types/chai": "^4.2.14",
-    "@types/fast-json-stable-stringify": "^2.0.0",
     "@types/js-yaml": "^4.0.0",
     "@types/mocha": "^9.0.0",
     "chai": "^4.3.0",
@@ -37,7 +36,7 @@
   },
   "dependencies": {
     "dataloader": "^2.0.0",
-    "fast-json-stable-stringify": "^2.1.0"
+    "txstate-utils": "^1.7.3"
   },
   "files": [
     "dist/**/*",

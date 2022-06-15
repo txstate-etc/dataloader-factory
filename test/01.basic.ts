@@ -1,32 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
-import yaml from 'js-yaml'
-import { promises as fsp } from 'fs'
 import { DataLoaderFactory, ManyJoinedLoader, ManyToManyLoader, OneToManyLoader, PrimaryKeyLoader } from '../src/index'
 import { expect } from 'chai'
-
-interface Author {
-  id: number
-  name: string
-}
-
-interface Book {
-  id: number
-  authorId: number
-  name: string
-  genres: string[]
-}
-
-interface BookFilter {
-  genre: string
-  authorIds?: number[]
-}
-
-async function getData (type: 'books'): Promise<Book[]>
-async function getData (type: 'authors'): Promise<Author[]>
-async function getData (type: string) {
-  const ymlstring = await fsp.readFile(`test/data/${type}.yml`, 'utf-8')
-  return yaml.load(ymlstring) as any[]
-}
+import { BookFilter, getData } from './common'
 
 let byAuthorIdCount = 0
 const booksByAuthorId = new OneToManyLoader({

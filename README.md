@@ -300,6 +300,69 @@ You no longer provide an `extractKey` function because you return it with each r
 will use the key you provide to put the data back together and then discard it, returning only the
 pristine `Book` from the `value` field back to the `.load()` call in your resolver.
 
+## Best-Match DataLoaders
+In some rare cases, you may have a key that provides a fuzzy match to an object. For instance, to
+create a self-healing link, you might have a key like `{ id: 9, path: '/about' }`. You're looking
+for an object that has id 9, or if nothing has id 9, then a an object with path `/about`.
+
+This is really complicated to dataload, so this library provides a `BestMatchLoader` especially for
+this case.
+
+Here's an example where I have a book's id, title, and author, but I'm not sure whether the id has
+changed in my database. So I want to fall back to title and author when id doesn't match.
+```typescript
+import { BestMatchLoader } from 'dataloader-factory'
+const bookByLinkLoader = new BestMatchLoader({
+  fetch: async (keys: { id: string, title: string, author: string }[]) => await db.get(`
+      SELECT * FROM books
+      WHERE id IN (${keys.map(key => '?').join(',')})
+      OR (title, author) IN ((${keys.map(key => '?,?').join('),(')}))
+    `, [...keys.map(key => key.id), ...keys.flatMap(key => [key.title, key.author])]),
+  scoreMatch: (key, book) => key.id === book.id
+    ? 2
+    : (key.author === book.author && key.title === book.title
+        ? 1
+        : 0)
+})
+```
+Then I can use the loader like normal, expecting AT MOST ONE result per key (it can still end up with no matches).
+```typescript
+export const libraryItemLinkResolver = (libraryItem, args, context) => {
+  const book = await context.dataLoaderFactory.get(bookByLinkLoader).load({
+    id: libraryItem.bookId,
+    title: libraryItem.title,
+    author: libraryItem.author
+  })
+  return book
+}
+```
+
+### Options
+```typescript
+new BestMatchLoader<KeyType, ObjectType>({
+  // see PrimaryKeyLoader options for discussion of context parameter
+  fetch: async (keys: KeyType[], context) => ObjectType[] // required
+
+  // take the key and an object and determine how well they match
+  // each key will only pick one "winner" which will be the item that returns
+  // the highest score
+  // return a score of 0 when the key and item do not match at all
+  scoreMatch: (key: KeyType, item: ObjectType) => number
+
+  // specify one or more primary key loaders and they will automatically
+  // be primed with any results gathered
+  // NOTE: if the above fetch function returns result objects that differ from those of
+  // the specified loader(s), it's going to cause you problems
+  idLoader: PrimaryKeyLoader|PrimaryKeyLoader[],
+
+  // the options object to pass to dataloader upon creation
+  // see dataloader documentation for details
+  // the default batch size will be 100 here, to help limit the impact of the O(n^2)
+  // nature of the BestMatchLoader's scoring strategy
+  options: DataLoader.Options
+})
+```
+
 ## Parameter-based filtering
 Now we get to the part where this library can really save your bacon. Consider the following GraphQL
 query:

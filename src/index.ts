@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-useless-constructor */
-import stringify from 'fast-json-stable-stringify'
+import { stringify } from 'txstate-utils'
 import DataLoader from 'dataloader'
 
 type MatchingKeyof<T, V> = keyof { [ P in keyof T as T[P] extends V ? P : never ]: P }
@@ -275,6 +275,46 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
   groupItems: (items: ReturnType[], dedupekeys: Map<string, KeyType>) => Record<string, ReturnType[]>
 }
 
+export interface BestMatchLoaderConfig<KeyType, ReturnType> extends Omit<LoaderConfig<KeyType, ReturnType>, 'extractId'> {
+  fetch: (keys: KeyType[], context: any) => Promise<ReturnType[]>
+  scoreMatch?: (key: KeyType, item: ReturnType) => number
+}
+export class BestMatchLoader<KeyType, ReturnType> extends Loader<KeyType, ReturnType, never> {
+  constructor (config: BestMatchLoaderConfig<KeyType, ReturnType>) {
+    super(config)
+    this.config.options = {
+      ...this.config.options,
+      maxBatchSize: config.options?.maxBatchSize ?? 100,
+      cacheKeyFn: config.options?.cacheKeyFn ?? stringify
+    }
+  }
+
+  init (factory: DataLoaderFactory) {
+    const cacheMap = this.config.options!.cacheMap ?? new Map()
+    const dl = new DataLoader<KeyType, ReturnType, string>(async (keys: readonly KeyType[]): Promise<any[]> => {
+      const items = await this.config.fetch(keys as KeyType[], factory.context)
+      for (const idLoader of this.idLoaders) {
+        for (const item of items) factory.get(idLoader).prime(idLoader.extractId(item), item)
+      }
+      const keyed = new Map<KeyType, { score: number, item: ReturnType }>()
+      for (const item of items) {
+        for (const key of keys) {
+          const score = this.config.scoreMatch(key, item)
+          if (score === 0) continue
+          if (!keyed.has(key) || keyed.get(key)!.score < score) keyed.set(key, { score, item })
+        }
+      }
+      return keys.map(key => keyed.get(key)?.item)
+    }, { ...this.config.options, cacheMap });
+    (dl as any).cacheMap = cacheMap
+    return dl
+  }
+
+  getDataLoader (cached: DataLoader<KeyType, ReturnType|undefined, string>) {
+    return cached
+  }
+}
+
 export interface FilteredStorageObject<KeyType, ReturnType> {
   loader: DataLoader<KeyType, ReturnType[], string>
   cache?: Map<string, Promise<ReturnType[]>>
@@ -299,6 +339,7 @@ export class DataLoaderFactory<ContextType = any> {
   }
 
   get<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>): DataLoader<KeyType, ReturnType|undefined, string>
+  get<KeyType, ReturnType> (loader: BestMatchLoader<KeyType, ReturnType>): DataLoader<KeyType, ReturnType|undefined, string>
   get<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): DataLoader<KeyType, ReturnType[], string>
   get<KeyType = any, ReturnType = any, FilterType = any> (loader: Loader<KeyType, ReturnType, FilterType>, filters?: FilterType): DataLoader<KeyType, ReturnType|undefined, string>|DataLoader<KeyType, ReturnType[], string> {
     let loaderCache = this.loaders.get(loader)
@@ -310,10 +351,11 @@ export class DataLoaderFactory<ContextType = any> {
   }
 
   async loadMany<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
+  async loadMany<KeyType, ReturnType> (loader: BestMatchLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, keys: KeyType[], filters?: FilterType): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: Loader<KeyType, ReturnType, FilterType>, keys: KeyType[], filter?: FilterType) {
-    if (loader instanceof PrimaryKeyLoader) {
-      const dl = this.get(loader)
+    if (loader instanceof PrimaryKeyLoader || loader instanceof BestMatchLoader) {
+      const dl = this.get(loader as PrimaryKeyLoader<KeyType, ReturnType>|BestMatchLoader<KeyType, ReturnType>)
       return (await Promise.all(keys.map(async k => await dl.load(k)))).filter(r => typeof r !== 'undefined')
     } else if (loader instanceof BaseManyLoader) {
       const dl = this.get(loader, filter)
@@ -322,10 +364,13 @@ export class DataLoaderFactory<ContextType = any> {
     return []
   }
 
-  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType>|BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>>|undefined {
+  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType>, filters?: FilterType): Map<string, Promise<ReturnType>>|undefined
+  getCache<KeyType, ReturnType, FilterType>(loader: BestMatchLoader<KeyType, ReturnType>, filters?: FilterType): Map<string, Promise<ReturnType>>|undefined
+  getCache<KeyType, ReturnType, FilterType>(loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>>|undefined
+  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType>|BestMatchLoader<KeyType, ReturnType>|BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>>|undefined {
     const cached = this.loaders.get(loader)
     if (!cached) return undefined
-    if (loader instanceof PrimaryKeyLoader) return (cached as any).cacheMap
+    if (loader instanceof PrimaryKeyLoader || loader instanceof BestMatchLoader) return (cached as any).cacheMap
     const cache = loader.getCache(cached as Map<string, FilteredStorageObject<any, any>>, filters)
     if (!cache) throw new Error('Cannot get cache for a loader that has the skipCache option enabled.')
     return cache
