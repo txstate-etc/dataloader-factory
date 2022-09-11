@@ -1,16 +1,16 @@
 {
   "name": "dataloader-factory",
-  "version": "4.4.2",
+  "version": "4.4.3",
   "description": "DataLoader classes to make it easier to write complex graphql resolvers.",
   "exports": {
+    "types": "./dist-esm/index.d.ts",
     "require": "./dist/index.js",
-    "import": "./dist-esm/index.js",
-    "types": "./dist/index.d.ts"
+    "import": "./dist-esm/index.js"
   },
-  "types": "./dist/index.d.ts",
+  "types": "./dist-esm/index.d.ts",
   "scripts": {
     "prepublishOnly": "npm run build",
-    "build": "rm -rf dist && tsc",
+    "build": "rm -rf dist && tsc && mv dist/index.d.ts dist-esm/index.d.ts",
     "test": "mocha -r ts-node/register test/**/*.ts"
   },
   "repository": {

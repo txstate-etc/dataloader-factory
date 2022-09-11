@@ -59,3 +59,4 @@ jspm_packages/
 
 .DS_Store
 dist/
+index.d.ts
