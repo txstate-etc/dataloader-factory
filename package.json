@@ -12,7 +12,7 @@
     "prepublishOnly": "npm run build",
     "build": "rm -rf dist && tsc && mv dist/index.d.ts dist-esm/index.d.ts",
     "test": "mocha -r ts-node/register test/**/*.ts",
-    "lint": "eslint --ignore-path .gitignore ."
+    "lint": "eslint src test"
   },
   "repository": {
     "type": "git",

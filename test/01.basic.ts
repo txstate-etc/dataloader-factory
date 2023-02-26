@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import { DataLoaderFactory, ManyJoinedLoader, ManyToManyLoader, OneToManyLoader, PrimaryKeyLoader } from '../src/index'
 import { expect } from 'chai'
-import { BookFilter, getData } from './common'
+import { type BookFilter, getData } from './common'
 
 let byAuthorIdCount = 0
 const booksByAuthorId = new OneToManyLoader({
