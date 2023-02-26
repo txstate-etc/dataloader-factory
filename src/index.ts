@@ -12,7 +12,7 @@ export abstract class Loader<KeyType, ReturnType, FilterType> {
   }
 
   abstract init (factory: DataLoaderFactory): any
-  abstract getDataLoader (cached: any, filters?: FilterType): DataLoader<KeyType, ReturnType|undefined, string>|DataLoader<KeyType, ReturnType[], string>
+  abstract getDataLoader (cached: any, filters?: FilterType): DataLoader<KeyType, ReturnType | undefined, string> | DataLoader<KeyType, ReturnType[], string>
   addIdLoader (loader: PrimaryKeyLoader<any, ReturnType>) {
     this.idLoaders.push(loader)
   }
@@ -20,8 +20,8 @@ export abstract class Loader<KeyType, ReturnType, FilterType> {
 
 export interface LoaderConfig<KeyType, ReturnType> {
   fetch: (ids: KeyType[], context: any) => Promise<ReturnType[]>
-  extractId?: MatchingKeyof<ReturnType, KeyType>|((item: ReturnType) => KeyType)
-  idLoader?: PrimaryKeyLoader<any, ReturnType>|PrimaryKeyLoader<any, ReturnType>[]
+  extractId?: MatchingKeyof<ReturnType, KeyType> | ((item: ReturnType) => KeyType)
+  idLoader?: PrimaryKeyLoader<any, ReturnType> | PrimaryKeyLoader<any, ReturnType>[]
   options?: DataLoader.Options<KeyType, ReturnType, string>
 }
 export class PrimaryKeyLoader<KeyType, ReturnType> extends Loader<KeyType, ReturnType, never> {
@@ -62,7 +62,7 @@ export class PrimaryKeyLoader<KeyType, ReturnType> extends Loader<KeyType, Retur
     return dl
   }
 
-  getDataLoader (cached: DataLoader<KeyType, ReturnType|undefined, string>) {
+  getDataLoader (cached: DataLoader<KeyType, ReturnType | undefined, string>) {
     return cached
   }
 }
@@ -75,8 +75,8 @@ export interface BaseManyLoaderConfig<KeyType, ReturnType, FilterType> {
   skipCache?: boolean
   maxBatchSize?: number
   cacheKeyFn?: (key: KeyType) => string
-  keysFromFilter?: (filter: FilterType|undefined) => KeyType[]
-  idLoader?: PrimaryKeyLoader<any, ReturnType>|PrimaryKeyLoader<any, ReturnType>[]
+  keysFromFilter?: (filter: FilterType | undefined) => KeyType[]
+  idLoader?: PrimaryKeyLoader<any, ReturnType> | PrimaryKeyLoader<any, ReturnType>[]
 }
 export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Loader<KeyType, ReturnType, FilterType> {
   constructor (public config: BaseManyLoaderConfig<KeyType, ReturnType, FilterType>) {
@@ -98,8 +98,8 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
     }
   }
 
-  abstract groupItems (items: ReturnType[]|ManyJoinedType<KeyType, ReturnType>[], dedupekeys: Map<string, KeyType>): Record<string, ReturnType[]>
-  abstract filterItems (items: ReturnType[]|ManyJoinedType<KeyType, ReturnType>[], filters: FilterType|undefined): ReturnType[]|ManyJoinedType<KeyType, ReturnType>[]
+  abstract groupItems (items: ReturnType[] | ManyJoinedType<KeyType, ReturnType>[], dedupekeys: Map<string, KeyType>): Record<string, ReturnType[]>
+  abstract filterItems (items: ReturnType[] | ManyJoinedType<KeyType, ReturnType>[], filters: FilterType | undefined): ReturnType[] | ManyJoinedType<KeyType, ReturnType>[]
 
   getDataLoader (cached: Map<string, FilteredStorageObject<KeyType, ReturnType>>, filters?: FilterType) {
     const filterstring = stringify(filters)
@@ -110,7 +110,7 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
         cache,
         loader: new DataLoader<KeyType, ReturnType[], string>(async (keys: readonly KeyType[]): Promise<(Error | ReturnType[])[]> => {
           const stringkeys: string[] = keys.map(this.config.cacheKeyFn!)
-          const dedupekeys: Map<string, KeyType> = new Map()
+          const dedupekeys = new Map<string, KeyType>()
           for (let i = 0; i < keys.length; i++) {
             dedupekeys.set(stringkeys[i], keys[i])
           }
@@ -144,7 +144,7 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
 
 export interface OneToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType, FilterType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ReturnType[]>
-  extractKey?: MatchingKeyof<ReturnType, KeyType>|((item: ReturnType) => KeyType)
+  extractKey?: MatchingKeyof<ReturnType, KeyType> | ((item: ReturnType) => KeyType)
   matchKey?: (key: KeyType, item: ReturnType) => boolean
 }
 export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extends BaseManyLoader<KeyType, ReturnType, FilterType> {
@@ -189,7 +189,7 @@ export class OneToManyLoader<KeyType, ReturnType, FilterType = undefined> extend
     }
   }
 
-  filterItems: (items: ReturnType[], filters: FilterType|undefined) => ReturnType[]
+  filterItems: (items: ReturnType[], filters: FilterType | undefined) => ReturnType[]
   groupItems: (items: ReturnType[], dedupekeys: Map<string, KeyType>) => Record<string, ReturnType[]>
 }
 
@@ -209,7 +209,7 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
     return ret
   }
 
-  filterItems (items: ManyJoinedType<KeyType, ReturnType>[], filters: FilterType|undefined) {
+  filterItems (items: ManyJoinedType<KeyType, ReturnType>[], filters: FilterType | undefined) {
     if (!this.config.keysFromFilter) return items
     const keys = new Set(this.config.keysFromFilter(filters).map(this.config.cacheKeyFn!))
     if (keys.size === 0) return items
@@ -225,7 +225,7 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
 
 export interface ManyToManyLoaderConfig<KeyType, ReturnType, FilterType> extends BaseManyLoaderConfig<KeyType, ReturnType, FilterType> {
   fetch: (keys: KeyType[], filters: FilterType, context: any) => Promise<ReturnType[]>
-  extractKeys?: MatchingKeyof<ReturnType, KeyType[]>|((item: ReturnType) => KeyType[])
+  extractKeys?: MatchingKeyof<ReturnType, KeyType[]> | ((item: ReturnType) => KeyType[])
   matchKey?: (key: KeyType, item: ReturnType) => boolean
 }
 export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> extends BaseManyLoader<KeyType, ReturnType, FilterType> {
@@ -271,7 +271,7 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
     }
   }
 
-  filterItems: (items: ReturnType[], filters: FilterType|undefined) => ReturnType[]
+  filterItems: (items: ReturnType[], filters: FilterType | undefined) => ReturnType[]
   groupItems: (items: ReturnType[], dedupekeys: Map<string, KeyType>) => Record<string, ReturnType[]>
 }
 
@@ -310,7 +310,7 @@ export class BestMatchLoader<KeyType, ReturnType> extends Loader<KeyType, Return
     return dl
   }
 
-  getDataLoader (cached: DataLoader<KeyType, ReturnType|undefined, string>) {
+  getDataLoader (cached: DataLoader<KeyType, ReturnType | undefined, string>) {
     return cached
   }
 }
@@ -324,13 +324,13 @@ function defaultId (item: any) {
   return item.id || item._id
 }
 
-function pushRecord (record: { [keys: string]: any[] }, key: string, item: any) {
+function pushRecord (record: Record<string, any[]>, key: string, item: any) {
   if (!record[key]) record[key] = []
   record[key].push(item)
 }
 
 export class DataLoaderFactory<ContextType = any> {
-  private loaders: Map<Loader<any, any, any>, DataLoader<any, any, string>|Map<string, FilteredStorageObject<any, any>>>
+  private loaders: Map<Loader<any, any, any>, DataLoader<any, any, string> | Map<string, FilteredStorageObject<any, any>>>
   public context: ContextType
 
   constructor (context?: ContextType) {
@@ -338,10 +338,10 @@ export class DataLoaderFactory<ContextType = any> {
     this.context = context ?? {} as any
   }
 
-  get<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>): DataLoader<KeyType, ReturnType|undefined, string>
-  get<KeyType, ReturnType> (loader: BestMatchLoader<KeyType, ReturnType>): DataLoader<KeyType, ReturnType|undefined, string>
+  get<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>): DataLoader<KeyType, ReturnType | undefined, string>
+  get<KeyType, ReturnType> (loader: BestMatchLoader<KeyType, ReturnType>): DataLoader<KeyType, ReturnType | undefined, string>
   get<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): DataLoader<KeyType, ReturnType[], string>
-  get<KeyType = any, ReturnType = any, FilterType = any> (loader: Loader<KeyType, ReturnType, FilterType>, filters?: FilterType): DataLoader<KeyType, ReturnType|undefined, string>|DataLoader<KeyType, ReturnType[], string> {
+  get<KeyType = any, ReturnType = any, FilterType = any> (loader: Loader<KeyType, ReturnType, FilterType>, filters?: FilterType): DataLoader<KeyType, ReturnType | undefined, string> | DataLoader<KeyType, ReturnType[], string> {
     let loaderCache = this.loaders.get(loader)
     if (!loaderCache) {
       loaderCache = loader.init(this as any)
@@ -355,7 +355,7 @@ export class DataLoaderFactory<ContextType = any> {
   async loadMany<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, keys: KeyType[], filters?: FilterType): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: Loader<KeyType, ReturnType, FilterType>, keys: KeyType[], filter?: FilterType) {
     if (loader instanceof PrimaryKeyLoader || loader instanceof BestMatchLoader) {
-      const dl = this.get(loader as PrimaryKeyLoader<KeyType, ReturnType>|BestMatchLoader<KeyType, ReturnType>)
+      const dl = this.get(loader as PrimaryKeyLoader<KeyType, ReturnType> | BestMatchLoader<KeyType, ReturnType>)
       return (await Promise.all(keys.map(async k => await dl.load(k)))).filter(r => typeof r !== 'undefined')
     } else if (loader instanceof BaseManyLoader) {
       const dl = this.get(loader, filter)
@@ -364,10 +364,10 @@ export class DataLoaderFactory<ContextType = any> {
     return []
   }
 
-  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType>, filters?: FilterType): Map<string, Promise<ReturnType>>|undefined
-  getCache<KeyType, ReturnType, FilterType>(loader: BestMatchLoader<KeyType, ReturnType>, filters?: FilterType): Map<string, Promise<ReturnType>>|undefined
-  getCache<KeyType, ReturnType, FilterType>(loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>>|undefined
-  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType>|BestMatchLoader<KeyType, ReturnType>|BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>>|undefined {
+  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType>, filters?: FilterType): Map<string, Promise<ReturnType>> | undefined
+  getCache<KeyType, ReturnType, FilterType>(loader: BestMatchLoader<KeyType, ReturnType>, filters?: FilterType): Map<string, Promise<ReturnType>> | undefined
+  getCache<KeyType, ReturnType, FilterType>(loader: BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>> | undefined
+  getCache<KeyType, ReturnType, FilterType>(loader: PrimaryKeyLoader<KeyType, ReturnType> | BestMatchLoader<KeyType, ReturnType> | BaseManyLoader<KeyType, ReturnType, FilterType>, filters?: FilterType): Map<string, Promise<ReturnType[]>> | undefined {
     const cached = this.loaders.get(loader)
     if (!cached) return undefined
     if (loader instanceof PrimaryKeyLoader || loader instanceof BestMatchLoader) return (cached as any).cacheMap
