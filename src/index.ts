@@ -12,7 +12,7 @@ export abstract class Loader<KeyType, ReturnType, FilterType> {
   }
 
   abstract init (factory: DataLoaderFactory): any
-  abstract getDataLoader (cached: any, filters?: FilterType): DataLoader<KeyType, ReturnType | undefined, string> | DataLoader<KeyType, ReturnType[], string>
+  abstract getDataLoader (cached: any, factory: DataLoaderFactory, filters?: FilterType): DataLoader<KeyType, ReturnType | undefined, string> | DataLoader<KeyType, ReturnType[], string>
   addIdLoader (loader: PrimaryKeyLoader<any, ReturnType>) {
     this.idLoaders.push(loader)
   }
@@ -86,22 +86,20 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
     (this.config as any).useCache = !this.config.skipCache
   }
 
-  protected factory!: DataLoaderFactory
   init (factory: DataLoaderFactory) {
-    this.factory = factory
     return new Map()
   }
 
-  prime (loader: PrimaryKeyLoader<any, ReturnType>, items: any) {
+  prime (loader: PrimaryKeyLoader<any, ReturnType>, factory: DataLoaderFactory, items: any) {
     for (const item of items) {
-      this.factory.get(loader).prime(loader.extractId(item), item)
+      factory.get(loader).prime(loader.extractId(item), item)
     }
   }
 
   abstract groupItems (items: ReturnType[] | ManyJoinedType<KeyType, ReturnType>[], dedupekeys: Map<string, KeyType>): Record<string, ReturnType[]>
   abstract filterItems (items: ReturnType[] | ManyJoinedType<KeyType, ReturnType>[], filters: FilterType | undefined): ReturnType[] | ManyJoinedType<KeyType, ReturnType>[]
 
-  getDataLoader (cached: Map<string, FilteredStorageObject<KeyType, ReturnType>>, filters?: FilterType) {
+  getDataLoader (cached: Map<string, FilteredStorageObject<KeyType, ReturnType>>, factory: DataLoaderFactory, filters?: FilterType) {
     const filterstring = stringify(filters)
     let storageObject = cached.get(filterstring)
     if (!storageObject) {
@@ -115,12 +113,12 @@ export abstract class BaseManyLoader<KeyType, ReturnType, FilterType> extends Lo
             dedupekeys.set(stringkeys[i], keys[i])
           }
           const items = this.filterItems(
-            await (this.config as any).fetch(Array.from(dedupekeys.values()), filters, this.factory.context),
+            await (this.config as any).fetch(Array.from(dedupekeys.values()), filters, factory.context),
             filters
           )
 
           for (const loader of this.idLoaders) {
-            this.prime(loader, items)
+            this.prime(loader, factory, items)
           }
 
           const grouped = this.groupItems(items, dedupekeys)
@@ -216,9 +214,9 @@ export class ManyJoinedLoader<KeyType, ReturnType, FilterType = undefined> exten
     return items.filter(itm => keys.has(this.config.cacheKeyFn!(itm.key)))
   }
 
-  prime (loader: PrimaryKeyLoader<any, ReturnType>, items: ManyJoinedType<KeyType, ReturnType>[]) {
+  prime (loader: PrimaryKeyLoader<any, ReturnType>, factory: DataLoaderFactory, items: ManyJoinedType<KeyType, ReturnType>[]) {
     for (const item of items) {
-      this.factory.get(loader).prime(loader.extractId(item.value), item.value)
+      factory.get(loader).prime(loader.extractId(item.value), item.value)
     }
   }
 }
@@ -347,7 +345,7 @@ export class DataLoaderFactory<ContextType = any> {
       loaderCache = loader.init(this as any)
       this.loaders.set(loader, loaderCache as any)
     }
-    return loader.getDataLoader(loaderCache, filters)
+    return loader.getDataLoader(loaderCache, this, filters)
   }
 
   async loadMany<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
