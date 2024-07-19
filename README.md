@@ -311,7 +311,7 @@ pristine `Book` from the `value` field back to the `.load()` call in your resolv
 ## Best-Match DataLoaders
 In some rare cases, you may have a key that provides a fuzzy match to an object. For instance, to
 create a self-healing link, you might have a key like `{ id: 9, path: '/about' }`. You're looking
-for an object that has id 9, or if nothing has id 9, then a an object with path `/about`.
+for an object that has id 9, or if nothing has id 9, then an object with path `/about`.
 
 This is really complicated to dataload, so this library provides a `BestMatchLoader` especially for
 this case.
@@ -538,7 +538,7 @@ to help limit scaling problems.
 const booksAfterYearLoader = new OneToManyLoader({
   fetch: (years, filters) => {
     const ors = years.map(parseInt).map(year => `published > DATE('${year}0101')`)
-    return db.query(`SELECT * FROM books WHERE ${ors.join(') OR (')}`
+    return db.query(`SELECT * FROM books WHERE (${ors.join(') OR (')})`
   },
   matchKey: (year, book) => book.published.getTime() >= new Date(year, 0, 1)
 })
