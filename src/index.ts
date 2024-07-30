@@ -401,6 +401,7 @@ export class DataLoaderFactory<ContextType = any> {
   }
 
   async loadMany<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
+  async loadMany<KeyType, ReturnType> (loader: ParentDocumentLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType> (loader: BestMatchLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, keys: KeyType[], filters?: FilterType): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: Loader<KeyType, ReturnType, FilterType>, keys: KeyType[], filter?: FilterType) {

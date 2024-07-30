@@ -1,6 +1,6 @@
 {
   "name": "dataloader-factory",
-  "version": "4.6.1",
+  "version": "4.6.2",
   "description": "DataLoader classes to make it easier to write complex graphql resolvers.",
   "exports": {
     "types": "./dist-esm/index.d.ts",
