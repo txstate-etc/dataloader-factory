@@ -38,9 +38,17 @@
   name: The Hound of the Baskervilles
   genres:
     - mystery
+  pages:
+    - id: 1
+    - id: 2
+    - id: 3
 - id: 9
   authorId: 1
   name: A Christmas Carol
   genres:
     - classic
     - holiday
+  pages:
+    - id: 4
+    - id: 5
+    - id: 6

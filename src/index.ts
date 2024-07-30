@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-useless-constructor */
-import { stringify } from 'txstate-utils'
+import { stringify, unique } from 'txstate-utils'
 import DataLoader from 'dataloader'
 
 type MatchingKeyof<T, V> = keyof { [ P in keyof T as T[P] extends V ? P : never ]: P }
@@ -273,6 +273,58 @@ export class ManyToManyLoader<KeyType, ReturnType, FilterType = undefined> exten
   groupItems: (items: ReturnType[], dedupekeys: Map<string, KeyType>) => Record<string, ReturnType[]>
 }
 
+export interface ParentDocumentLoaderConfig<KeyType, ReturnType> {
+  fetch: (ids: KeyType[], context: any) => Promise<ReturnType[]>
+  childIds: (item: ReturnType) => KeyType[]
+  parentId?: MatchingKeyof<ReturnType, KeyType> | ((item: ReturnType) => KeyType)
+  idLoader?: PrimaryKeyLoader<any, ReturnType> | PrimaryKeyLoader<any, ReturnType>[]
+  options?: DataLoader.Options<KeyType, ReturnType, string>
+}
+export class ParentDocumentLoader<KeyType, ReturnType> extends Loader<KeyType, ReturnType, never> {
+  childIds: (obj: ReturnType) => KeyType[]
+  parentId: (obj: ReturnType) => KeyType
+
+  constructor (public config: ParentDocumentLoaderConfig<KeyType, ReturnType>) {
+    super(config)
+    this.childIds = config.childIds
+    const parentId = config.parentId ?? defaultId
+    if (typeof parentId === 'function') {
+      this.parentId = parentId
+    } else {
+      this.parentId = (itm: any) => itm[parentId]
+    }
+    this.config.options = {
+      ...this.config.options,
+      maxBatchSize: config.options?.maxBatchSize ?? 1000,
+      cacheKeyFn: config.options?.cacheKeyFn ?? stringify
+    }
+  }
+
+  init (factory: DataLoaderFactory) {
+    const cacheMap = this.config.options!.cacheMap ?? new Map()
+    const dl = new DataLoader<KeyType, ReturnType, string>(async (ids: readonly KeyType[]): Promise<any[]> => {
+      const items = await this.config.fetch(ids as KeyType[], factory.context)
+      for (const idLoader of this.idLoaders) {
+        for (const item of items) {
+          factory.get(idLoader).prime(idLoader.extractId(item), item)
+        }
+      }
+      const keyed = items.reduce((keyed: Map<any, ReturnType>, item) => {
+        const keys = this.childIds(item).map(this.config.options!.cacheKeyFn!)
+        for (const key of keys) keyed.set(key, item)
+        return keyed
+      }, new Map())
+      return ids.map(this.config.options!.cacheKeyFn!).map(id => keyed.get(id))
+    }, { ...this.config.options, cacheMap });
+    (dl as any).cacheMap = cacheMap
+    return dl
+  }
+
+  getDataLoader (cached: DataLoader<KeyType, ReturnType | undefined, string>) {
+    return cached
+  }
+}
+
 export interface BestMatchLoaderConfig<KeyType, ReturnType> extends Omit<LoaderConfig<KeyType, ReturnType>, 'extractId'> {
   fetch: (keys: KeyType[], context: any) => Promise<ReturnType[]>
   scoreMatch?: (key: KeyType, item: ReturnType) => number
@@ -352,7 +404,11 @@ export class DataLoaderFactory<ContextType = any> {
   async loadMany<KeyType, ReturnType> (loader: BestMatchLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: BaseManyLoader<KeyType, ReturnType, FilterType>, keys: KeyType[], filters?: FilterType): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType, FilterType> (loader: Loader<KeyType, ReturnType, FilterType>, keys: KeyType[], filter?: FilterType) {
-    if (loader instanceof PrimaryKeyLoader || loader instanceof BestMatchLoader) {
+    if (loader instanceof ParentDocumentLoader) {
+      const dl = this.get(loader as ParentDocumentLoader<KeyType, ReturnType>)
+      const parentDocs = await Promise.all(keys.map(async k => await dl.load(k)))
+      return unique(parentDocs.filter(r => r != null), loader.parentId)
+    } else if (loader instanceof PrimaryKeyLoader || loader instanceof BestMatchLoader) {
       const dl = this.get(loader as PrimaryKeyLoader<KeyType, ReturnType> | BestMatchLoader<KeyType, ReturnType>)
       return (await Promise.all(keys.map(async k => await dl.load(k)))).filter(r => typeof r !== 'undefined')
     } else if (loader instanceof BaseManyLoader) {

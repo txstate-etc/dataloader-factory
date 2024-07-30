@@ -11,6 +11,7 @@ export interface Book {
   authorId: number
   name: string
   genres: string[]
+  pages?: { id: number }[]
 }
 
 export interface BookFilter {

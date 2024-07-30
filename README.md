@@ -370,6 +370,48 @@ new BestMatchLoader<KeyType, ObjectType>({
   options: DataLoader.Options
 })
 ```
+## Parent Document DataLoaders
+In document-oriented database, you may sometimes have arrays of globally unique addressable objects that
+canonically live inside a larger document. For example, if you stored books in a single collection with
+all their pages, maybe your document would look like:
+```javascript
+{ id: 'uieYY09j6P', name: 'The Grapes of Wrath', pages: [{ id: 'nyT694sm23', text: '...' }] }
+```
+The page belongs to the book and does not exist anywhere else. If you want to look up the book based on
+the id of one of its pages, you might try to write a OneToManyLoader, but it will return an array and ask
+for filters when those are not expected. Additionally, the loadMany function will return multiple copies
+of the parent document.
+
+To solve all of these problems, a ParentDocumentLoader is provided.
+
+### Options
+```typescript
+new ParentDocumentLoader<KeyType, ObjectType>({
+  // see PrimaryKeyLoader options for discussion of context parameter
+  fetch: async (childIds: KeyType[], context) => ObjectType[], // required
+
+  // return the unique ids of the child objects inside the parent
+  // document, these should be globally unique ids that match the
+  // childIds passed to the fetch function
+  childIds: (parentDoc: ObjectType) => KeyType[],
+
+  // return the unique id of of the parent document
+  // only needed when using loadMany and will guess '_id' or 'id' the same
+  // as extractId
+  parentId?: keyof ObjectType | (item => string),
+
+  // specify one or more primary key loaders for the parent document
+  // automatically priming a primary key loader for the child documents is not
+  // supported but you can do it yourself
+  idLoader?: PrimaryKeyLoader|PrimaryKeyLoader[],
+
+  // the options object to pass to dataloader upon creation
+  // see dataloader documentation for details
+  // the default batch size will be 100 here, to help limit the impact of the O(n^2)
+  // nature of the BestMatchLoader's scoring strategy
+  options?: DataLoader.Options
+})
+```
 
 ## Parameter-based filtering
 Now we get to the part where this library can really save your bacon. Consider the following GraphQL
