@@ -2,6 +2,7 @@
 import { DataLoaderFactory, ManyJoinedLoader, ManyToManyLoader, OneToManyLoader, PrimaryKeyLoader } from '../src/index'
 import { expect } from 'chai'
 import { type BookFilter, getData } from './common'
+import { get } from 'http'
 
 let byAuthorIdCount = 0
 const booksByAuthorId = new OneToManyLoader({
@@ -57,8 +58,10 @@ const booksByIdAndTitle = new PrimaryKeyLoader({
     )
     return ret
   },
+  idLoader: booksById,
   extractId: book => ({ id: book.id, name: book.name })
 })
+booksById.addIdLoader(booksByIdAndTitle)
 
 let customStringifyCount = 0
 const booksByIdAndTitleCustomStringify = new PrimaryKeyLoader({
@@ -204,6 +207,25 @@ describe('bookloader', () => {
     }
     expect(factory.getCache(booksById)).to.have.lengthOf(2)
   })
+
+  it('should be able to prime the booksById and booksByIdAndTitle caches by just priming booksById', async () => {
+    factory.get(booksById).clearAll()
+    factory.get(booksByIdAndTitle).clearAll()
+    const books = await getData('books')
+    factory.prime(booksById, books)
+    expect(factory.getCache(booksById)).to.have.lengthOf(9)
+    expect(factory.getCache(booksByIdAndTitle)).to.have.lengthOf(9)
+  })
+
+  it('should be able to prime the booksById and booksByIdAndTitle caches by just priming booksByIdAndTitle', async () => {
+    factory.get(booksById).clearAll()
+    factory.get(booksByIdAndTitle).clearAll()
+    const books = await getData('books')
+    factory.prime(booksByIdAndTitle, books)
+    expect(factory.getCache(booksById)).to.have.lengthOf(9)
+    expect(factory.getCache(booksByIdAndTitle)).to.have.lengthOf(9)
+  })
+
   it('should support matchKey in one-to-many pattern', async () => {
     const books = await factory.get(booksByAuthorIdMatchKey, { genre: 'mystery' }).load(2)
     expect(books).to.have.length(1)

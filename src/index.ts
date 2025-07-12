@@ -400,6 +400,17 @@ export class DataLoaderFactory<ContextType = any> {
     return loader.getDataLoader(loaderCache, this, filters)
   }
 
+  prime <KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>, values: ReturnType | ReturnType[]): void {
+    const loaders = [loader, ...(loader.idLoaders ?? [])]
+    const allValues = Array.isArray(values) ? values : [values]
+    for (const l of loaders) {
+      const dl = this.get(l)
+      for (const value of allValues) {
+        dl.prime(l.extractId(value), value)
+      }
+    }
+  }
+
   async loadMany<KeyType, ReturnType> (loader: PrimaryKeyLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType> (loader: ParentDocumentLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
   async loadMany<KeyType, ReturnType> (loader: BestMatchLoader<KeyType, ReturnType>, keys: KeyType[]): Promise<ReturnType[]>
